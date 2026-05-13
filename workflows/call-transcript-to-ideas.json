@@ -346,7 +346,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: 'Date', direction: 'descending' }], page_size: 100 }) }}",
+        "jsonBody": "={{ JSON.stringify({ sorts: [{ timestamp: \"created_time\", direction: \"descending\" }], page_size: 100 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -564,7 +564,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: 'Date', direction: 'descending' }], page_size: 1 }) }}",
+        "jsonBody": "={{ JSON.stringify({ sorts: [{ timestamp: \"created_time\", direction: \"descending\" }], page_size: 1 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -671,7 +671,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ filter: $json.specific_call_ref?.type === 'call_number' ? { property: 'Name', title: { contains: 'Call ' + $json.specific_call_ref.value } } : { property: 'Date', date: { equals: $json.specific_call_ref?.value || '' } } }) }}",
+        "jsonBody": "={{ JSON.stringify(\n  $json.specific_call_ref?.type === 'call_number'\n    ? { filter: { property: 'Name', title: { contains: 'Call ' + $json.specific_call_ref.value } }, page_size: 1 }\n    : { sorts: [{ timestamp: 'created_time', direction: 'descending' }], page_size: 1 }\n) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
