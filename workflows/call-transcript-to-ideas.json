@@ -349,7 +349,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: \"Call Date\", direction: \"descending\" }], page_size: 100 }) }}",
+        "jsonBody": "={{ JSON.stringify({ page_size: 100 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
