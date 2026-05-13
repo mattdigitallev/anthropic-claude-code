@@ -250,7 +250,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "function blocksToText(blocks) {\n  return (blocks || []).map(block => {\n    const type = block.type;\n    if (!block[type]) return '';\n    const richText = block[type].rich_text || block[type].text || [];\n    return richText.map(t => t.plain_text || '').join('');\n  }).filter(Boolean).join('\\n');\n}\n\nconst dashboardInfo = $('Extract Client DB IDs').first().json;\n\n// DEBUG: surface exactly what the named ref returns so we can diagnose undefined IDs\nif (!dashboardInfo?.call_agendas_db_id) {\n  throw new Error('DEBUG — Extract Client DB IDs ref returned: ' + JSON.stringify(dashboardInfo) + ' | keys in $input.all()[0].json: ' + Object.keys($input.all()[0]?.json || {}).join(', '));\n}\n\n// allItems[0] = Fetch Intelligence Brief blocks, allItems[1] = Fetch Content Strategy Doc blocks\nconst allItems = $input.all();\nconst intelBlocks = allItems[0]?.json?.results || [];\nconst strategyBlocks = allItems[1]?.json?.results || [];\n\nconst intelBriefText = blocksToText(intelBlocks);\nconst strategyDocText = blocksToText(strategyBlocks);\n\nconst totalPostsMatch = strategyDocText.match(/(\\d+)\\s*(?:posts?(?:\\/| per )(?:week|batch)|per\\s+(?:week|batch))/i);\nconst totalPostsPerBatch = totalPostsMatch ? parseInt(totalPostsMatch[1]) : 14;\n\nconst linkedinMatch = strategyDocText.match(/linkedin[:\\s]+([0-9]+)/i);\nconst xMatch = strategyDocText.match(/(?:x|twitter)[:\\s]+([0-9]+)/i);\nconst linkedinPosts = linkedinMatch ? parseInt(linkedinMatch[1]) : Math.ceil(totalPostsPerBatch / 2);\nconst xPosts = xMatch ? parseInt(xMatch[1]) : totalPostsPerBatch - linkedinPosts;\n\nconst transcriptBaseShare = Math.ceil(totalPostsPerBatch * 0.65);\nconst transcriptQuota = transcriptBaseShare + 3;\n\nconst hasMiscPillar = /miscellaneous/i.test(intelBriefText);\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    intel_brief_text: intelBriefText,\n    strategy_doc_text: strategyDocText,\n    total_posts_per_batch: totalPostsPerBatch,\n    linkedin_posts: linkedinPosts,\n    x_posts: xPosts,\n    transcript_idea_quota: transcriptQuota,\n    has_misc_pillar: hasMiscPillar\n  }\n}];"
+        "jsCode": "function blocksToText(blocks) {\n  return (blocks || []).map(block => {\n    const type = block.type;\n    if (!block[type]) return '';\n    const richText = block[type].rich_text || block[type].text || [];\n    return richText.map(t => t.plain_text || '').join('');\n  }).filter(Boolean).join('\\n');\n}\n\nconst dashboardInfo = $('Extract Client DB IDs').first().json;\n\n// allItems[0] = Fetch Intelligence Brief blocks, allItems[1] = Fetch Content Strategy Doc blocks\nconst allItems = $input.all();\nconst intelBlocks = allItems[0]?.json?.results || [];\nconst strategyBlocks = allItems[1]?.json?.results || [];\n\nconst intelBriefText = blocksToText(intelBlocks);\nconst strategyDocText = blocksToText(strategyBlocks);\n\nconst totalPostsMatch = strategyDocText.match(/(\\d+)\\s*(?:posts?(?:\\/| per )(?:week|batch)|per\\s+(?:week|batch))/i);\nconst totalPostsPerBatch = totalPostsMatch ? parseInt(totalPostsMatch[1]) : 14;\n\nconst linkedinMatch = strategyDocText.match(/linkedin[:\\s]+([0-9]+)/i);\nconst xMatch = strategyDocText.match(/(?:x|twitter)[:\\s]+([0-9]+)/i);\nconst linkedinPosts = linkedinMatch ? parseInt(linkedinMatch[1]) : Math.ceil(totalPostsPerBatch / 2);\nconst xPosts = xMatch ? parseInt(xMatch[1]) : totalPostsPerBatch - linkedinPosts;\n\nconst transcriptBaseShare = Math.ceil(totalPostsPerBatch * 0.65);\nconst transcriptQuota = transcriptBaseShare + 3;\n\nconst hasMiscPillar = /miscellaneous/i.test(intelBriefText);\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    intel_brief_text: intelBriefText,\n    strategy_doc_text: strategyDocText,\n    total_posts_per_batch: totalPostsPerBatch,\n    linkedin_posts: linkedinPosts,\n    x_posts: xPosts,\n    transcript_idea_quota: transcriptQuota,\n    has_misc_pillar: hasMiscPillar\n  }\n}];"
       }
     },
     {
@@ -436,8 +436,8 @@
       "parameters": {
         "method": "POST",
         "url": "https://docs.googleapis.com/v1/documents",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "oAuth2Api",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -452,7 +452,7 @@
         "jsonBody": "={{ JSON.stringify({ title: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage - Transcript' }) }}"
       },
       "credentials": {
-        "oAuth2Api": {
+        "googleOAuth2Api": {
           "id": "AloBHpx18tpSVq93",
           "name": "Google OAuth2"
         }
@@ -482,9 +482,9 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.doc_id }}:batchUpdate",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "oAuth2Api",
+        "url": "={{ 'https://docs.googleapis.com/v1/documents/' + $json.doc_id + ':batchUpdate' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -499,7 +499,7 @@
         "jsonBody": "={{ JSON.stringify($json.batch_update_body) }}"
       },
       "credentials": {
-        "oAuth2Api": {
+        "googleOAuth2Api": {
           "id": "AloBHpx18tpSVq93",
           "name": "Google OAuth2"
         }
@@ -751,12 +751,12 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.transcript_doc_url.match(/\\/d\\/([a-zA-Z0-9_-]+)/)?.[1] || 'INVALID' }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "oAuth2Api"
+        "url": "={{ 'https://docs.googleapis.com/v1/documents/' + ($json.transcript_doc_url.match(/\\/d\\/([a-zA-Z0-9_-]+)/)?.[1] || 'INVALID') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api"
       },
       "credentials": {
-        "oAuth2Api": {
+        "googleOAuth2Api": {
           "id": "AloBHpx18tpSVq93",
           "name": "Google OAuth2"
         }
