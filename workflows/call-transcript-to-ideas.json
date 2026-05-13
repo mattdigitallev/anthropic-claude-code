@@ -533,7 +533,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $('Extract Client DB IDs').first().json.call_agendas_db_id }, properties: { Title: { title: [{ text: { content: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage' } }] }, 'Transcript URL': { url: $json.doc_url }, 'Call Date': { date: { start: ($json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $('Extract Client DB IDs').first().json.call_agendas_db_id }, properties: { Title: { title: [{ text: { content: 'Call ' + $('Prepare Transcript for Doc').first().json.new_call_number + ' - ' + $('Prepare Transcript for Doc').first().json.client_name + ' x Digital Leverage' } }] }, 'Transcript URL': { url: $('Prepare Transcript for Doc').first().json.doc_url }, 'Call Date': { date: { start: ($('Prepare Transcript for Doc').first().json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
