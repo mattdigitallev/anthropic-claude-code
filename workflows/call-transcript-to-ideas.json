@@ -58,8 +58,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -122,8 +122,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -160,8 +160,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -204,8 +204,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -235,8 +235,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -313,7 +313,7 @@
       },
       "credentials": {
         "httpHeaderAuth": {
-          "id": "",
+          "id": "2xe5Fu89Y7JRKtxW",
           "name": "Grain API"
         }
       }
@@ -351,8 +351,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -399,7 +399,7 @@
       },
       "credentials": {
         "httpHeaderAuth": {
-          "id": "",
+          "id": "2xe5Fu89Y7JRKtxW",
           "name": "Grain API"
         }
       }
@@ -433,7 +433,7 @@
       },
       "credentials": {
         "oAuth2Api": {
-          "id": "",
+          "id": "AloBHpx18tpSVq93",
           "name": "Google OAuth2"
         }
       }
@@ -480,7 +480,7 @@
       },
       "credentials": {
         "oAuth2Api": {
-          "id": "",
+          "id": "AloBHpx18tpSVq93",
           "name": "Google OAuth2"
         }
       }
@@ -518,8 +518,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -569,8 +569,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -676,8 +676,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -737,7 +737,7 @@
       },
       "credentials": {
         "oAuth2Api": {
-          "id": "",
+          "id": "AloBHpx18tpSVq93",
           "name": "Google OAuth2"
         }
       }
@@ -788,8 +788,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -839,7 +839,7 @@
       },
       "credentials": {
         "httpHeaderAuth": {
-          "id": "",
+          "id": "4T8Kci2Im6elVzo2",
           "name": "Anthropic API"
         }
       }
@@ -890,8 +890,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -941,7 +941,7 @@
       },
       "credentials": {
         "httpHeaderAuth": {
-          "id": "",
+          "id": "4T8Kci2Im6elVzo2",
           "name": "Anthropic API"
         }
       }
@@ -992,8 +992,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -1043,8 +1043,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -1081,8 +1081,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -1146,8 +1146,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -1206,7 +1206,7 @@
       },
       "credentials": {
         "httpHeaderAuth": {
-          "id": "",
+          "id": "U9j3VSN4WONZsZml",
           "name": "Slack API"
         }
       }
@@ -1328,8 +1328,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -1359,8 +1359,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -1390,8 +1390,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     },
@@ -1421,8 +1421,8 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "",
-          "name": "Notion API"
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
       }
     }
