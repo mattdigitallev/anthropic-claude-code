@@ -435,7 +435,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "https://www.googleapis.com/drive/v3/files",
+        "url": "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleOAuth2Api",
         "sendHeaders": true,
