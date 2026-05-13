@@ -293,23 +293,26 @@
         180
       ],
       "parameters": {
-        "method": "GET",
-        "url": "https://api.grain.com/v1/recordings",
+        "method": "POST",
+        "url": "https://api.grain.com/_/public-api/v2/recordings",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
-        "sendQuery": true,
-        "queryParameters": {
+        "sendHeaders": true,
+        "headerParameters": {
           "parameters": [
             {
-              "name": "participant_email",
-              "value": "={{ $json.primary_email }}"
+              "name": "Public-Api-Version",
+              "value": "2025-10-31"
             },
             {
-              "name": "limit",
-              "value": "100"
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
-        }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ include: { participants: true } }) }}"
       },
       "credentials": {
         "httpHeaderAuth": {
@@ -379,7 +382,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst grainCalls = (grainRaw?.recordings || grainRaw?.data || (Array.isArray(grainRaw) ? grainRaw : [grainRaw])).filter(c => c && (c.id || c.recording_id));\nconst notionRows = notionRaw?.results || [];\n\nconst sortedGrainCalls = [...grainCalls].sort((a, b) => new Date(a.started_at || a.created_at || 0) - new Date(b.started_at || b.created_at || 0));\n\nconst latestGrainCall = sortedGrainCalls[sortedGrainCalls.length - 1];\nconst callNumber = Math.max(notionRows.length + 1, sortedGrainCalls.length);\n\nreturn [{\n  json: {\n    ...contextData,\n    latest_grain_call_id: latestGrainCall?.id || latestGrainCall?.recording_id || '',\n    latest_grain_call_date: latestGrainCall?.started_at || latestGrainCall?.created_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
+        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst primaryEmail = (contextData.primary_email || '').toLowerCase();\nconst allRecordings = grainRaw?.recordings || [];\n\n// Filter to calls that include the client's email as a participant\nconst grainCalls = allRecordings.filter(c => {\n  if (!c?.id) return false;\n  if (!primaryEmail) return true;\n  return (c.participants || []).some(p => (p.email || '').toLowerCase() === primaryEmail);\n});\n\nconst notionRows = notionRaw?.results || [];\n\nconst sortedGrainCalls = [...grainCalls].sort((a, b) =>\n  new Date(a.start_datetime || a.started_at || 0) - new Date(b.start_datetime || b.started_at || 0)\n);\n\nconst latestGrainCall = sortedGrainCalls[sortedGrainCalls.length - 1];\nconst callNumber = Math.max(notionRows.length + 1, sortedGrainCalls.length);\n\nreturn [{\n  json: {\n    ...contextData,\n    latest_grain_call_id: latestGrainCall?.id || '',\n    latest_grain_call_date: latestGrainCall?.start_datetime || latestGrainCall?.started_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
       }
     },
     {
@@ -393,9 +396,26 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "=https://api.grain.com/v1/recordings/{{ $json.latest_grain_call_id }}/transcript",
+        "url": "=https://api.grain.com/_/public-api/v2/recordings/{{ $json.latest_grain_call_id }}/transcript.txt",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Public-Api-Version",
+              "value": "2025-10-31"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
       },
       "credentials": {
         "httpHeaderAuth": {
@@ -448,7 +468,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "const crosscheckData = $('Cross-check Dates and Determine Call Number').first().json;\n\n// input[0] = Fetch Grain Transcript, input[1] = Create Google Doc\nconst allItems = $input.all();\nconst grainTranscript = allItems[0]?.json || {};\nconst createdDoc = allItems[1]?.json || {};\n\nlet transcriptText = '';\nif (Array.isArray(grainTranscript?.transcript)) {\n  transcriptText = grainTranscript.transcript.map(seg => `[${seg.timestamp || seg.start || ''}] ${seg.speaker || 'Speaker'}: ${seg.text || seg.content || ''}`).join('\\n');\n} else if (Array.isArray(grainTranscript?.utterances)) {\n  transcriptText = grainTranscript.utterances.map(u => `[${u.start || ''}] ${u.speaker || 'Speaker'}: ${u.text || ''}`).join('\\n');\n} else if (grainTranscript?.text) {\n  transcriptText = grainTranscript.text;\n} else {\n  transcriptText = JSON.stringify(grainTranscript, null, 2);\n}\n\nconst docId = createdDoc.documentId;\nconst docUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nreturn [{\n  json: {\n    ...crosscheckData,\n    doc_id: docId,\n    doc_url: docUrl,\n    transcript_text: transcriptText,\n    batch_update_body: { requests: [{ insertText: { location: { index: 1 }, text: transcriptText } }] }\n  }\n}];"
+        "jsCode": "const crosscheckData = $('Cross-check Dates and Determine Call Number').first().json;\n\n// input[0] = Fetch Grain Transcript (plain text response in .data), input[1] = Create Google Doc\nconst allItems = $input.all();\nconst transcriptItem = allItems[0]?.json || {};\nconst createdDoc = allItems[1]?.json || {};\n\n// transcript.txt returns plain text stored in .data by n8n\nconst transcriptText = (transcriptItem.data || transcriptItem.text || '').trim();\n\nconst docId = createdDoc.documentId;\nconst docUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nreturn [{\n  json: {\n    ...crosscheckData,\n    doc_id: docId,\n    doc_url: docUrl,\n    transcript_text: transcriptText,\n    batch_update_body: { requests: [{ insertText: { location: { index: 1 }, text: transcriptText } }] }\n  }\n}];"
       }
     },
     {
