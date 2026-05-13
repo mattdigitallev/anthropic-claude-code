@@ -1444,8 +1444,8 @@
           },
           "conditions": [
             {
-              "id": "has-rows",
-              "leftValue": "={{ ($json.results || []).length > 0 }}",
+              "id": "has-url",
+              "leftValue": "={{ ($json.results || []).length > 0 && !!$json.results[0]?.properties?.['Transcript URL']?.url }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
