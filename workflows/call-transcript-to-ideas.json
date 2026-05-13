@@ -332,7 +332,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.call_agendas_db_id + '/query' }}",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Extract Client DB IDs').first().json.call_agendas_db_id + '/query' }}",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -533,7 +533,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.call_agendas_db_id }, properties: { Title: { title: [{ text: { content: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage' } }] }, 'Transcript URL': { url: $json.doc_url }, 'Call Date': { date: { start: ($json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $('Extract Client DB IDs').first().json.call_agendas_db_id }, properties: { Title: { title: [{ text: { content: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage' } }] }, 'Transcript URL': { url: $json.doc_url }, 'Call Date': { date: { start: ($json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -567,7 +567,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.call_agendas_db_id + '/query' }}",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Extract Client DB IDs').first().json.call_agendas_db_id + '/query' }}",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -674,7 +674,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.call_agendas_db_id + '/query' }}",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Extract Client DB IDs').first().json.call_agendas_db_id + '/query' }}",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -990,7 +990,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "=https://api.notion.com/v1/databases/{{ $json.master_content_db_id }}/query",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Extract Client DB IDs').first().json.master_content_db_id + '/query' }}",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -1058,7 +1058,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.master_content_db_id }, properties: { Idea: { title: [{ text: { content: $json.batch_name } }] }, Status: { status: { name: 'Ideating' } } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $('Extract Client DB IDs').first().json.master_content_db_id }, properties: { Idea: { title: [{ text: { content: $json.batch_name } }] }, Status: { status: { name: 'Ideating' } } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
