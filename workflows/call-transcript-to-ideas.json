@@ -37,8 +37,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/databases/2ee6c2b131cf80589dd2d240b392b468/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -54,10 +53,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ filter: { property: 'Name', title: { equals: $json.client_name } } }) }}"
+        "jsonBody": "={{ JSON.stringify({ filter: { property: 'Name', title: { equals: $json.client_name } } }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -88,8 +88,7 @@
       "parameters": {
         "method": "GET",
         "url": "=https://api.notion.com/v1/blocks/{{ $json.dashboard_page_id }}/children?page_size=100",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -98,10 +97,11 @@
               "value": "2022-06-28"
             }
           ]
-        }
+        },
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -132,8 +132,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/search",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -149,10 +148,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ query: 'Intelligence Brief', filter: { value: 'page', property: 'object' } }) }}"
+        "jsonBody": "={{ JSON.stringify({ query: 'Intelligence Brief', filter: { value: 'page', property: 'object' } }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -170,8 +170,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/search",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -187,10 +186,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ query: 'Content Strategy', filter: { value: 'page', property: 'object' } }) }}"
+        "jsonBody": "={{ JSON.stringify({ query: 'Content Strategy', filter: { value: 'page', property: 'object' } }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -221,8 +221,7 @@
       "parameters": {
         "method": "GET",
         "url": "=https://api.notion.com/v1/blocks/{{ $json.intel_brief_page_id }}/children?page_size=100",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -231,10 +230,11 @@
               "value": "2022-06-28"
             }
           ]
-        }
+        },
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -252,8 +252,7 @@
       "parameters": {
         "method": "GET",
         "url": "=https://api.notion.com/v1/blocks/{{ $json.strategy_doc_page_id }}/children?page_size=100",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -262,10 +261,11 @@
               "value": "2022-06-28"
             }
           ]
-        }
+        },
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -361,8 +361,7 @@
       "parameters": {
         "method": "POST",
         "url": "=https://api.notion.com/v1/databases/{{ $json.call_agendas_db_id }}/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -378,10 +377,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: 'Date', direction: 'descending' }], page_size: 100 }) }}"
+        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: 'Date', direction: 'descending' }], page_size: 100 }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -528,8 +528,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/pages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -545,10 +544,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.call_agendas_db_id }, properties: { Name: { title: [{ text: { content: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage' } }] }, 'Transcript Doc': { url: $json.doc_url }, Date: { date: { start: ($json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}"
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.call_agendas_db_id }, properties: { Name: { title: [{ text: { content: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage' } }] }, 'Transcript Doc': { url: $json.doc_url }, Date: { date: { start: ($json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -579,8 +579,7 @@
       "parameters": {
         "method": "POST",
         "url": "=https://api.notion.com/v1/databases/{{ $json.call_agendas_db_id }}/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -596,10 +595,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: 'Date', direction: 'descending' }], page_size: 1 }) }}"
+        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: 'Date', direction: 'descending' }], page_size: 1 }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -686,8 +686,7 @@
       "parameters": {
         "method": "POST",
         "url": "=https://api.notion.com/v1/databases/{{ $json.call_agendas_db_id }}/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -703,10 +702,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ filter: $json.specific_call_ref?.type === 'call_number' ? { property: 'Name', title: { contains: 'Call ' + $json.specific_call_ref.value } } : { property: 'Date', date: { equals: $json.specific_call_ref?.value || '' } } }) }}"
+        "jsonBody": "={{ JSON.stringify({ filter: $json.specific_call_ref?.type === 'call_number' ? { property: 'Name', title: { contains: 'Call ' + $json.specific_call_ref.value } } : { property: 'Date', date: { equals: $json.specific_call_ref?.value || '' } } }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -798,8 +798,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/databases/35f6c2b131cf8082a803e176f6100edc/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -815,10 +814,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{ \"page_size\": 100 }"
+        "jsonBody": "{ \"page_size\": 100 }",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -900,8 +900,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/databases/35f6c2b131cf8082a803e176f6100edc/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -917,10 +916,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ filter: { or: $json.format_names_needed.slice(0,100).map(name => ({ property: 'Format Name', title: { equals: name } })) }, page_size: 100 }) }}"
+        "jsonBody": "={{ JSON.stringify({ filter: { or: $json.format_names_needed.slice(0,100).map(name => ({ property: 'Format Name', title: { equals: name } })) }, page_size: 100 }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -1002,8 +1002,7 @@
       "parameters": {
         "method": "POST",
         "url": "=https://api.notion.com/v1/databases/{{ $json.master_content_db_id }}/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1019,10 +1018,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{ \"page_size\": 100 }"
+        "jsonBody": "{ \"page_size\": 100 }",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -1053,8 +1053,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/pages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1070,10 +1069,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.master_content_db_id }, properties: { Name: { title: [{ text: { content: $json.batch_name } }] }, Status: { select: { name: 'For Review' } }, 'Batch Date': { date: { start: $json.batch_date } } } }) }}"
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.master_content_db_id }, properties: { Name: { title: [{ text: { content: $json.batch_name } }] }, Status: { select: { name: 'For Review' } }, 'Batch Date': { date: { start: $json.batch_date } } } }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -1091,8 +1091,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/databases",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1108,10 +1107,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $('Create Batch Page').first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Post Lineup Overview' } }], properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'yellow' }, { name: 'Approved', color: 'green' }, { name: 'In Progress', color: 'blue' }, { name: 'Scheduled', color: 'purple' }, { name: 'Published', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, Format: { rich_text: {} }, 'Content Pillar': { select: { options: [] } }, Topic: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}"
+        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $('Create Batch Page').first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Post Lineup Overview' } }], properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'yellow' }, { name: 'Approved', color: 'green' }, { name: 'In Progress', color: 'blue' }, { name: 'Scheduled', color: 'purple' }, { name: 'Published', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, Format: { rich_text: {} }, 'Content Pillar': { select: { options: [] } }, Topic: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
@@ -1156,8 +1156,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/pages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1173,10 +1172,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.post_lineup_db_id }, properties: { Idea: { title: [{ text: { content: ($json.idea || '').substring(0, 2000) } }] }, Status: { select: { name: 'For Review' } }, Platform: { select: { name: $json.platform || 'LinkedIn' } }, Format: { rich_text: [{ text: { content: ($json.format || '').substring(0, 2000) } }] }, 'Content Pillar': { select: { name: $json.content_pillar || 'Miscellaneous' } }, Topic: { rich_text: [{ text: { content: ($json.topic || '').substring(0, 2000) } }] }, Sources: { rich_text: [{ text: { content: ($json.sources || '').substring(0, 2000) } }] }, Notes: { rich_text: [{ text: { content: ($json.notes_for_reviewer || '').substring(0, 2000) } }] } } }) }}"
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.post_lineup_db_id }, properties: { Idea: { title: [{ text: { content: ($json.idea || '').substring(0, 2000) } }] }, Status: { select: { name: 'For Review' } }, Platform: { select: { name: $json.platform || 'LinkedIn' } }, Format: { rich_text: [{ text: { content: ($json.format || '').substring(0, 2000) } }] }, 'Content Pillar': { select: { name: $json.content_pillar || 'Miscellaneous' } }, Topic: { rich_text: [{ text: { content: ($json.topic || '').substring(0, 2000) } }] }, Sources: { rich_text: [{ text: { content: ($json.sources || '').substring(0, 2000) } }] }, Notes: { rich_text: [{ text: { content: ($json.notes_for_reviewer || '').substring(0, 2000) } }] } } }) }}",
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
+        "notionApi": {
           "id": "",
           "name": "Notion API"
         }
