@@ -1141,7 +1141,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.post_lineup_db_id }, properties: { Idea: { title: [{ text: { content: ($json.idea || '').substring(0, 2000) } }] }, Status: { select: { name: 'For Review' } }, Platform: { select: { name: $json.platform || 'LinkedIn' } }, Format: { rich_text: [{ text: { content: ($json.format || '').substring(0, 2000) } }] }, 'Content Pillar': { select: { name: $json.content_pillar || 'Miscellaneous' } }, Topic: { rich_text: [{ text: { content: ($json.topic || '').substring(0, 2000) } }] }, Sources: { rich_text: [{ text: { content: ($json.sources || '').substring(0, 2000) } }] }, Notes: { rich_text: [{ text: { content: ($json.notes_for_reviewer || '').substring(0, 2000) } }] } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.post_lineup_db_id }, properties: { Idea: { title: [{ text: { content: ($json.idea || '').substring(0, 2000) } }] }, Status: { status: { name: 'For Review' } }, Platform: { select: { name: $json.platform || 'LinkedIn' } }, Format: { rich_text: [{ text: { content: ($json.format || '').substring(0, 2000) } }] }, 'Content Pillar': { select: { name: $json.content_pillar || 'Miscellaneous' } }, Topic: { rich_text: [{ text: { content: ($json.topic || '').substring(0, 2000) } }] }, Sources: { rich_text: [{ text: { content: ($json.sources || '').substring(0, 2000) } }] }, Notes: { rich_text: [{ text: { content: ($json.notes_for_reviewer || '').substring(0, 2000) } }] } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
