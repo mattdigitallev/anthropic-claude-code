@@ -1096,7 +1096,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $('Create Batch Page').first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Post Lineup Overview' } }], properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'yellow' }, { name: 'Approved', color: 'green' }, { name: 'In Progress', color: 'blue' }, { name: 'Scheduled', color: 'purple' }, { name: 'Published', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, Format: { rich_text: {} }, 'Content Pillar': { rich_text: {} }, Topic: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $('Create Batch Page').first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Post Lineup Overview' } }], properties: { Idea: { title: {} }, 'Review Status': { select: { options: [{ name: 'For Review', color: 'yellow' }, { name: 'Approved', color: 'green' }, { name: 'In Progress', color: 'blue' }, { name: 'Scheduled', color: 'purple' }, { name: 'Published', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, Format: { rich_text: {} }, 'Content Pillar': { rich_text: {} }, Topic: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -1161,7 +1161,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.post_lineup_db_id }, properties: { Idea: { title: [{ text: { content: ($json.idea || '').substring(0, 2000) } }] }, Status: { select: { name: 'For Review' } }, Platform: { select: { name: $json.platform || 'LinkedIn' } }, Format: { rich_text: [{ text: { content: ($json.format || '').substring(0, 2000) } }] }, 'Content Pillar': { rich_text: [{ text: { content: ($json.content_pillar || '').substring(0, 2000) } }] }, Topic: { rich_text: [{ text: { content: ($json.topic || '').substring(0, 2000) } }] }, Sources: { rich_text: [{ text: { content: ($json.sources || '').substring(0, 2000) } }] }, Notes: { rich_text: [{ text: { content: ($json.notes_for_reviewer || '').substring(0, 2000) } }] } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.post_lineup_db_id }, properties: { Idea: { title: [{ text: { content: ($json.idea || '').substring(0, 2000) } }] }, 'Review Status': { select: { name: 'For Review' } }, Platform: { select: { name: $json.platform || 'LinkedIn' } }, Format: { rich_text: [{ text: { content: ($json.format || '').substring(0, 2000) } }] }, 'Content Pillar': { rich_text: [{ text: { content: ($json.content_pillar || '').substring(0, 2000) } }] }, Topic: { rich_text: [{ text: { content: ($json.topic || '').substring(0, 2000) } }] }, Sources: { rich_text: [{ text: { content: ($json.sources || '').substring(0, 2000) } }] }, Notes: { rich_text: [{ text: { content: ($json.notes_for_reviewer || '').substring(0, 2000) } }] } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -1519,6 +1519,19 @@
       ],
       "parameters": {
         "jsCode": "// Dynamically discover column names from the actual Notion DB schema\nconst schema = $input.first().json;\nconst prepData = $('Prepare Transcript for Doc').first().json;\nconst dbId = $('Extract Client DB IDs').first().json.call_agendas_db_id;\n\nconst schemaProps = schema.properties || {};\n\n// Find the title property (the main column - its type is always 'title')\nconst titlePropName = Object.entries(schemaProps).find(([, v]) => v.type === 'title')?.[0] || 'Name';\n// Find a url-type property\nconst urlPropName = Object.entries(schemaProps).find(([, v]) => v.type === 'url')?.[0];\n// Find a date-type property\nconst datePropName = Object.entries(schemaProps).find(([k, v]) => v.type === 'date')?.[0];\n\nconst callNum = prepData.new_call_number || '?';\nconst clientName = prepData.client_name || '?';\nconst callDate = (prepData.latest_grain_call_date || new Date().toISOString()).split('T')[0];\nconst docUrl = prepData.doc_url;\n\n// Diagnostics logged so they appear in n8n execution log\nconsole.log(`Schema title column: \"${titlePropName}\", url column: \"${urlPropName || 'none'}\", date column: \"${datePropName || 'none'}\"`);\nconsole.log(`prepData.doc_url: ${docUrl}`);\n\nconst properties = {};\nproperties[titlePropName] = { title: [{ type: 'text', text: { content: 'Call ' + callNum + ' - ' + clientName + ' x Digital Leverage' } }] };\nif (datePropName) {\n  properties[datePropName] = { date: { start: callDate } };\n}\nif (urlPropName && docUrl) {\n  properties[urlPropName] = { url: docUrl };\n} else if (!docUrl) {\n  console.log('WARNING: doc_url missing from Prepare Transcript for Doc output - Transcript URL will not be set');\n}\n\nreturn [{ json: { row_body: { parent: { database_id: dbId }, properties } } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000062",
+      "name": "Log Idea Row Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        560
+      ],
+      "parameters": {
+        "jsCode": "// Debug: log what we're about to send to Notion for Create Idea Row\nconst item = $input.first().json;\nconst body = {\n  parent: { database_id: item.post_lineup_db_id },\n  properties: {\n    Idea: { title: [{ text: { content: (item.idea || '').substring(0, 200) } }] },\n    'Review Status': { select: { name: 'For Review' } },\n    Platform: { select: { name: item.platform || 'LinkedIn' } },\n    Format: { rich_text: [{ text: { content: (item.format || '').substring(0, 200) } }] },\n    'Content Pillar': { rich_text: [{ text: { content: (item.content_pillar || '').substring(0, 200) } }] },\n    Topic: { rich_text: [{ text: { content: (item.topic || '').substring(0, 200) } }] },\n    Sources: { rich_text: [{ text: { content: (item.sources || '').substring(0, 200) } }] },\n    Notes: { rich_text: [{ text: { content: (item.notes_for_reviewer || '').substring(0, 200) } }] }\n  }\n};\nconsole.log('post_lineup_db_id:', item.post_lineup_db_id);\nconsole.log('Notion body (first 500 chars):', JSON.stringify(body).substring(0, 500));\nreturn [{ json: { ...item, _debug_body: JSON.stringify(body) } }];"
       }
     }
   ],
@@ -2062,14 +2075,14 @@
       "main": [
         [
           {
-            "node": "Build Slack Message",
+            "node": "Log Idea Row Body",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Create Idea Row",
+            "node": "Build Slack Message",
             "type": "main",
             "index": 0
           }
@@ -2230,6 +2243,17 @@
         [
           {
             "node": "Create Call Agendas Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Idea Row Body": {
+      "main": [
+        [
+          {
+            "node": "Create Idea Row",
             "type": "main",
             "index": 0
           }
