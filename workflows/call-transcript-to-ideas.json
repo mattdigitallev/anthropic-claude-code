@@ -584,7 +584,7 @@
         580
       ],
       "parameters": {
-        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (rows.length === 0) {\n  throw new Error(`No call agendas found for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to import from Grain.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript URL']?.url || '';\nconst callTitle = props['Title']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`No transcript URL in the latest Call Agendas row for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to re-import.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
+        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript URL']?.url || '';\nconst callTitle = props['Title']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`Latest Call Agendas row has no Transcript URL for: ${contextData.client_name}. Open that row in Notion and add the Google Doc link.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
       }
     },
     {
@@ -1425,6 +1425,37 @@
           "name": "Notion (via API)"
         }
       }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000063",
+      "name": "IF Has Existing Transcript",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3460,
+        580
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-rows",
+              "leftValue": "={{ ($json.results || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
     }
   ],
   "connections": {
@@ -1701,7 +1732,7 @@
       "main": [
         [
           {
-            "node": "Package Existing Transcript Data",
+            "node": "IF Has Existing Transcript",
             "type": "main",
             "index": 0
           }
@@ -2095,6 +2126,29 @@
         [
           {
             "node": "Extract Client DB IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Has Existing Transcript": {
+      "main": [
+        [
+          {
+            "node": "Package Existing Transcript Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Query Grain All Calls",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Query Call Agendas for Cross-check",
             "type": "main",
             "index": 0
           }
