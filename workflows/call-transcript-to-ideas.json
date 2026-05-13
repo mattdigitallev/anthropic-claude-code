@@ -117,7 +117,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ query: 'Intelligence Brief', filter: { value: 'page', property: 'object' } }) }}",
+        "jsonBody": "={{ JSON.stringify({ query: \"Intelligence Brief - \" + $(\"Pre-process Inputs\").first().json.client_name.replace(/\\s*\\(.*?\\)\\s*/g, \"\").trim(), filter: { value: \"page\", property: \"object\" } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -155,7 +155,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ query: 'Content Strategy', filter: { value: 'page', property: 'object' } }) }}",
+        "jsonBody": "={{ JSON.stringify({ query: \"Content Strategy Doc - \" + $(\"Pre-process Inputs\").first().json.client_name.replace(/\\s*\\(.*?\\)\\s*/g, \"\").trim(), filter: { value: \"page\", property: \"object\" } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
