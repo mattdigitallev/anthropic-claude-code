@@ -435,7 +435,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true",
+        "url": "https://www.googleapis.com/drive/v3/files",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleOAuth2Api",
         "sendHeaders": true,
@@ -449,7 +449,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ name: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage - Transcript', mimeType: 'application/vnd.google-apps.document', parents: ['0ACuwlr4RLPxvUk9PVA'] }) }}"
+        "jsonBody": "={{ JSON.stringify({ name: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage - Transcript', mimeType: 'application/vnd.google-apps.document' }) }}"
       },
       "credentials": {
         "googleOAuth2Api": {
