@@ -584,7 +584,7 @@
         580
       ],
       "parameters": {
-        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript URL']?.url || '';\nconst callTitle = props['Title']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`Latest Call Agendas row has no Transcript URL for: ${contextData.client_name}. Open that row in Notion and add the Google Doc link.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
+        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (!rows.length) {\n  throw new Error(`Call Agendas is empty for ${contextData.client_name} — should have been caught by IF node. Check IF Has Existing Transcript routing.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript URL']?.url || '';\nconst callTitle = props['Title']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`Latest Call Agendas row has no Transcript URL for: ${contextData.client_name}. Open that row in Notion and add the Google Doc link.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
       }
     },
     {
@@ -1440,16 +1440,16 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
               "id": "has-rows",
-              "leftValue": "={{ ($json.results || []).length }}",
-              "rightValue": 0,
+              "leftValue": "={{ ($json.results || []).length > 0 }}",
+              "rightValue": true,
               "operator": {
-                "type": "number",
-                "operation": "gt"
+                "type": "boolean",
+                "operation": "true"
               }
             }
           ],
