@@ -1,27 +1,8 @@
 {
   "name": "📞 Call Transcript → Ideas",
-  "_readme": {
-    "setup": [
-      "1. Import this JSON into n8n (New Workflow → ··· → Import from JSON)",
-      "2. For each HTTP Request node, open it and select your credential in the Authentication dropdown",
-      "3. Credentials you need to create in n8n (Settings → Credentials → New):",
-      "   - 'Notion API'       → type: Header Auth  | Header Name: Authorization | Value: Bearer <your-notion-token>",
-      "   - 'Grain API'        → type: Header Auth  | Header Name: Authorization | Value: Bearer <your-grain-token>",
-      "   - 'Anthropic API'    → type: Header Auth  | Header Name: x-api-key     | Value: <your-anthropic-key>",
-      "   - 'Slack API'        → type: Header Auth  | Header Name: Authorization | Value: Bearer <your-slack-bot-token>",
-      "   - 'Google OAuth2'    → type: Google OAuth2 API (built-in n8n type, follow OAuth flow)",
-      "4. The ONLY value you must hardcode is BATCH_TEMPLATE_PAGE_ID (see node 'Create Batch Page')",
-      "   Go to your Notion batch template page, copy the page ID from the URL, paste it there"
-    ],
-    "known_ids": {
-      "client_dashboards_db": "2ee6c2b131cf80589dd2d240b392b468",
-      "format_bank_db": "35f6c2b131cf8082a803e176f6100edc",
-      "slack_content_hq_channel": "C0B1Y5EGZPA"
-    }
-  },
   "nodes": [
     {
-      "id": "trigger_1",
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
       "name": "Receive from Orchestrator",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
@@ -29,17 +10,17 @@
       "parameters": {}
     },
     {
-      "id": "code_preprocess",
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
       "name": "Pre-process Inputs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [380, 400],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\n\nconst clientName = input.client_name || '';\nconst batchDate = input.batch_date || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest = input.fetch_latest_call_transcript === true || input.fetch_latest_call_transcript === 'true';\nconst notesRaw = (input.notes_for_ai || '').trim();\n\n// Detect specific past call reference in notes\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\n// Derive call sign: initials of capitalised words, strip parentheticals\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name: clientName,\n    batch_date: batchDate,\n    fetch_latest_transcript: fetchLatest,\n    notes_for_ai: notesRaw,\n    specific_call_ref: specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign: callSign\n  }\n}];"
+        "jsCode": "const input = $input.first().json;\n\nconst clientName = input.client_name || '';\nconst batchDate = input.batch_date || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest = input.fetch_latest_call_transcript === true || input.fetch_latest_call_transcript === 'true';\nconst notesRaw = (input.notes_for_ai || '').trim();\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name: clientName,\n    batch_date: batchDate,\n    fetch_latest_transcript: fetchLatest,\n    notes_for_ai: notesRaw,\n    specific_call_ref: specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign: callSign\n  }\n}];"
       }
     },
     {
-      "id": "http_find_dashboard",
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
       "name": "Find Client Dashboard",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -63,17 +44,17 @@
       }
     },
     {
-      "id": "code_extract_dashboard",
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
       "name": "Extract Dashboard Info",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [940, 400],
       "parameters": {
-        "jsCode": "const notionResult = $input.first().json;\nconst preprocess = $('Pre-process Inputs').first().json;\n\nif (!notionResult.results || notionResult.results.length === 0) {\n  throw new Error(`No client dashboard found for: ${preprocess.client_name}. Check the client name matches exactly in Notion.`);\n}\n\nconst dashboard = notionResult.results[0];\nconst props = dashboard.properties || {};\n\nconst primaryEmail = props['Primary Email']?.email\n  || props['Primary Email']?.rich_text?.[0]?.plain_text || '';\nconst secondaryEmail = props['Secondary Email']?.email\n  || props['Secondary Email']?.rich_text?.[0]?.plain_text || '';\n\nreturn [{\n  json: {\n    ...preprocess,\n    dashboard_page_id: dashboard.id,\n    primary_email: primaryEmail,\n    secondary_email: secondaryEmail\n  }\n}];"
+        "jsCode": "const notionResult = $input.first().json;\nconst preprocess = $('Pre-process Inputs').first().json;\n\nif (!notionResult.results || notionResult.results.length === 0) {\n  throw new Error(`No client dashboard found for: ${preprocess.client_name}. Check the client name matches exactly in Notion.`);\n}\n\nconst dashboard = notionResult.results[0];\nconst props = dashboard.properties || {};\n\nconst primaryEmail = props['Primary Email']?.email || props['Primary Email']?.rich_text?.[0]?.plain_text || '';\nconst secondaryEmail = props['Secondary Email']?.email || props['Secondary Email']?.rich_text?.[0]?.plain_text || '';\n\nreturn [{\n  json: {\n    ...preprocess,\n    dashboard_page_id: dashboard.id,\n    primary_email: primaryEmail,\n    secondary_email: secondaryEmail\n  }\n}];"
       }
     },
     {
-      "id": "http_list_dashboard_children",
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
       "name": "List Dashboard Child Blocks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -85,25 +66,23 @@
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" }
-          ]
+          "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }]
         },
         "credentials": { "httpHeaderAuth": { "id": "", "name": "Notion API" } }
       }
     },
     {
-      "id": "code_extract_db_ids",
+      "id": "a1b2c3d4-0001-4000-8000-000000000006",
       "name": "Extract Client DB IDs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1500, 400],
       "parameters": {
-        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\nconst blocks = $input.first().json?.results || [];\n\n// Find child databases by title\nconst childDatabases = blocks.filter(b => b.type === 'child_database');\n\nlet callAgendasDbId = null;\nlet masterContentDbId = null;\n\nfor (const db of childDatabases) {\n  const title = (db.child_database?.title || '').toLowerCase();\n  if (title.includes('call agenda') || title.includes('call log')) {\n    callAgendasDbId = db.id;\n  }\n  if (title.includes('master content') || title.includes('content database')) {\n    masterContentDbId = db.id;\n  }\n}\n\n// Fallback: also check linked/synced databases in the page blocks\nif (!callAgendasDbId || !masterContentDbId) {\n  const linked = blocks.filter(b => b.type === 'linked_to_page' || b.type === 'child_page');\n  // These may require a deeper fetch; note them as warnings rather than errors\n  // The user should ensure databases are top-level in the dashboard\n}\n\nif (!callAgendasDbId) {\n  throw new Error(`Could not find 'Call Agendas' database in ${dashboardInfo.client_name}'s dashboard. Ensure it is a top-level database on the dashboard page.`);\n}\nif (!masterContentDbId) {\n  throw new Error(`Could not find 'Master Content Database' in ${dashboardInfo.client_name}'s dashboard. Ensure it is a top-level database on the dashboard page.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasDbId,\n    master_content_db_id: masterContentDbId\n  }\n}];"
+        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\nconst blocks = $input.first().json?.results || [];\n\nconst childDatabases = blocks.filter(b => b.type === 'child_database');\n\nlet callAgendasDbId = null;\nlet masterContentDbId = null;\n\nfor (const db of childDatabases) {\n  const title = (db.child_database?.title || '').toLowerCase();\n  if (title.includes('call agenda') || title.includes('call log')) {\n    callAgendasDbId = db.id;\n  }\n  if (title.includes('master content') || title.includes('content database')) {\n    masterContentDbId = db.id;\n  }\n}\n\nif (!callAgendasDbId) {\n  throw new Error(`Could not find 'Call Agendas' database in ${dashboardInfo.client_name}'s dashboard. Ensure it is a top-level database on the dashboard page (not inside a toggle).`);\n}\nif (!masterContentDbId) {\n  throw new Error(`Could not find 'Master Content Database' in ${dashboardInfo.client_name}'s dashboard. Ensure it is a top-level database on the dashboard page.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasDbId,\n    master_content_db_id: masterContentDbId\n  }\n}];"
       }
     },
     {
-      "id": "http_find_intel_brief",
+      "id": "a1b2c3d4-0001-4000-8000-000000000007",
       "name": "Find Intelligence Brief Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -127,7 +106,7 @@
       }
     },
     {
-      "id": "http_find_strategy_doc",
+      "id": "a1b2c3d4-0001-4000-8000-000000000008",
       "name": "Find Content Strategy Doc Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -151,17 +130,17 @@
       }
     },
     {
-      "id": "code_resolve_page_ids",
+      "id": "a1b2c3d4-0001-4000-8000-000000000009",
       "name": "Resolve Page IDs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [2060, 400],
       "parameters": {
-        "jsCode": "const dashboardInfo = $('Extract Client DB IDs').first().json;\nconst dashboardId = dashboardInfo.dashboard_page_id;\n\nconst intelResults = $('Find Intelligence Brief Page').first().json?.results || [];\nconst intelPage = intelResults.find(p => p.parent?.page_id === dashboardId.replace(/-/g,'') || p.parent?.page_id === dashboardId)\n  || intelResults.find(p => (p.properties?.title?.title?.[0]?.plain_text || '').toLowerCase().includes('intelligence brief'))\n  || intelResults[0];\n\nconst strategyResults = $('Find Content Strategy Doc Page').first().json?.results || [];\nconst strategyPage = strategyResults.find(p => p.parent?.page_id === dashboardId.replace(/-/g,'') || p.parent?.page_id === dashboardId)\n  || strategyResults.find(p => (p.properties?.title?.title?.[0]?.plain_text || '').toLowerCase().includes('content strategy'))\n  || strategyResults[0];\n\nif (!intelPage) throw new Error('Intelligence Brief page not found for: ' + dashboardInfo.client_name);\nif (!strategyPage) throw new Error('Content Strategy Doc page not found for: ' + dashboardInfo.client_name);\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    intel_brief_page_id: intelPage.id,\n    strategy_doc_page_id: strategyPage.id\n  }\n}];"
+        "jsCode": "const dashboardInfo = $('Extract Client DB IDs').first().json;\nconst dashboardId = dashboardInfo.dashboard_page_id;\n\nconst intelResults = $('Find Intelligence Brief Page').first().json?.results || [];\nconst intelPage = intelResults.find(p => p.parent?.page_id === dashboardId.replace(/-/g,'') || p.parent?.page_id === dashboardId) || intelResults[0];\n\nconst strategyResults = $('Find Content Strategy Doc Page').first().json?.results || [];\nconst strategyPage = strategyResults.find(p => p.parent?.page_id === dashboardId.replace(/-/g,'') || p.parent?.page_id === dashboardId) || strategyResults[0];\n\nif (!intelPage) throw new Error('Intelligence Brief page not found for: ' + dashboardInfo.client_name);\nif (!strategyPage) throw new Error('Content Strategy Doc page not found for: ' + dashboardInfo.client_name);\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    intel_brief_page_id: intelPage.id,\n    strategy_doc_page_id: strategyPage.id\n  }\n}];"
       }
     },
     {
-      "id": "http_fetch_intel_brief",
+      "id": "a1b2c3d4-0001-4000-8000-000000000010",
       "name": "Fetch Intelligence Brief",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -179,7 +158,7 @@
       }
     },
     {
-      "id": "http_fetch_strategy_doc",
+      "id": "a1b2c3d4-0001-4000-8000-000000000011",
       "name": "Fetch Content Strategy Doc",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -197,18 +176,18 @@
       }
     },
     {
-      "id": "code_extract_context",
-      "name": "Extract Context & Calculate Quota",
+      "id": "a1b2c3d4-0001-4000-8000-000000000012",
+      "name": "Extract Context and Calculate Quota",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [2620, 400],
       "parameters": {
-        "jsCode": "function blocksToText(blocks) {\n  return (blocks || []).map(block => {\n    const type = block.type;\n    if (!block[type]) return '';\n    const richText = block[type].rich_text || block[type].text || [];\n    const text = richText.map(t => t.plain_text || '').join('');\n    // Include toggle/callout children text if nested\n    return text;\n  }).filter(Boolean).join('\\n');\n}\n\nconst dashboardInfo = $('Resolve Page IDs').first().json;\nconst intelBlocks = $('Fetch Intelligence Brief').first().json?.results || [];\nconst strategyBlocks = $('Fetch Content Strategy Doc').first().json?.results || [];\n\nconst intelBriefText = blocksToText(intelBlocks);\nconst strategyDocText = blocksToText(strategyBlocks);\n\n// Parse total posts per batch from strategy doc\nconst totalPostsMatch = strategyDocText.match(/(\\d+)\\s*(?:posts?(?:\\/| per )(?:week|batch)|per\\s+(?:week|batch))/i);\nconst totalPostsPerBatch = totalPostsMatch ? parseInt(totalPostsMatch[1]) : 14;\n\n// Parse platform split\nconst linkedinMatch = strategyDocText.match(/linkedin[:\\s]+([0-9]+)/i);\nconst xMatch = strategyDocText.match(/(?:x|twitter)[:\\s]+([0-9]+)/i);\nconst linkedinPosts = linkedinMatch ? parseInt(linkedinMatch[1]) : Math.ceil(totalPostsPerBatch / 2);\nconst xPosts = xMatch ? parseInt(xMatch[1]) : totalPostsPerBatch - linkedinPosts;\n\n// Transcript is highest-priority source: ~65% base + 3 buffer\nconst transcriptBaseShare = Math.ceil(totalPostsPerBatch * 0.65);\nconst transcriptQuota = transcriptBaseShare + 3;\n\n// Check for Miscellaneous pillar\nconst hasMiscPillar = /miscellaneous/i.test(intelBriefText);\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    intel_brief_text: intelBriefText,\n    strategy_doc_text: strategyDocText,\n    total_posts_per_batch: totalPostsPerBatch,\n    linkedin_posts: linkedinPosts,\n    x_posts: xPosts,\n    transcript_idea_quota: transcriptQuota,\n    has_misc_pillar: hasMiscPillar\n  }\n}];"
+        "jsCode": "function blocksToText(blocks) {\n  return (blocks || []).map(block => {\n    const type = block.type;\n    if (!block[type]) return '';\n    const richText = block[type].rich_text || block[type].text || [];\n    return richText.map(t => t.plain_text || '').join('');\n  }).filter(Boolean).join('\\n');\n}\n\nconst dashboardInfo = $('Resolve Page IDs').first().json;\nconst intelBlocks = $('Fetch Intelligence Brief').first().json?.results || [];\nconst strategyBlocks = $('Fetch Content Strategy Doc').first().json?.results || [];\n\nconst intelBriefText = blocksToText(intelBlocks);\nconst strategyDocText = blocksToText(strategyBlocks);\n\nconst totalPostsMatch = strategyDocText.match(/(\\d+)\\s*(?:posts?(?:\\/| per )(?:week|batch)|per\\s+(?:week|batch))/i);\nconst totalPostsPerBatch = totalPostsMatch ? parseInt(totalPostsMatch[1]) : 14;\n\nconst linkedinMatch = strategyDocText.match(/linkedin[:\\s]+([0-9]+)/i);\nconst xMatch = strategyDocText.match(/(?:x|twitter)[:\\s]+([0-9]+)/i);\nconst linkedinPosts = linkedinMatch ? parseInt(linkedinMatch[1]) : Math.ceil(totalPostsPerBatch / 2);\nconst xPosts = xMatch ? parseInt(xMatch[1]) : totalPostsPerBatch - linkedinPosts;\n\nconst transcriptBaseShare = Math.ceil(totalPostsPerBatch * 0.65);\nconst transcriptQuota = transcriptBaseShare + 3;\n\nconst hasMiscPillar = /miscellaneous/i.test(intelBriefText);\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    intel_brief_text: intelBriefText,\n    strategy_doc_text: strategyDocText,\n    total_posts_per_batch: totalPostsPerBatch,\n    linkedin_posts: linkedinPosts,\n    x_posts: xPosts,\n    transcript_idea_quota: transcriptQuota,\n    has_misc_pillar: hasMiscPillar\n  }\n}];"
       }
     },
     {
-      "id": "if_fetch_transcript",
-      "name": "IF: Fetch Latest Transcript?",
+      "id": "a1b2c3d4-0001-4000-8000-000000000013",
+      "name": "IF Fetch Latest Transcript",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [2900, 400],
@@ -227,8 +206,8 @@
       }
     },
     {
-      "id": "http_grain_all_calls",
-      "name": "Query Grain – All Calls",
+      "id": "a1b2c3d4-0001-4000-8000-000000000014",
+      "name": "Query Grain All Calls",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [3180, 180],
@@ -248,8 +227,8 @@
       }
     },
     {
-      "id": "http_query_call_agendas_fresh",
-      "name": "Query Call Agendas (for cross-check)",
+      "id": "a1b2c3d4-0001-4000-8000-000000000015",
+      "name": "Query Call Agendas for Cross-check",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [3180, 380],
@@ -272,25 +251,25 @@
       }
     },
     {
-      "id": "merge_grain_agendas",
-      "name": "Merge Grain + Agendas",
+      "id": "a1b2c3d4-0001-4000-8000-000000000016",
+      "name": "Merge Grain and Agendas",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [3460, 280],
       "parameters": { "mode": "append" }
     },
     {
-      "id": "code_crosscheck_calls",
-      "name": "Cross-check Dates & Determine Call #",
+      "id": "a1b2c3d4-0001-4000-8000-000000000017",
+      "name": "Cross-check Dates and Determine Call Number",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [3740, 280],
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context & Calculate Quota').first().json;\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\n// Normalise Grain response — handle various response shapes\nconst grainCalls = (grainRaw?.recordings || grainRaw?.data || (Array.isArray(grainRaw) ? grainRaw : [grainRaw]))\n  .filter(c => c && (c.id || c.recording_id));\n\nconst notionRows = notionRaw?.results || [];\n\n// Sort Grain calls by date ascending to establish true chronological order\nconst sortedGrainCalls = [...grainCalls].sort((a, b) => {\n  return new Date(a.started_at || a.created_at || a.date || 0) - new Date(b.started_at || b.created_at || b.date || 0);\n});\n\n// Determine call number: compare Grain count vs Notion row count, use the higher\nconst latestGrainCall = sortedGrainCalls[sortedGrainCalls.length - 1];\nconst callNumber = Math.max(notionRows.length + 1, sortedGrainCalls.length);\n\nreturn [{\n  json: {\n    ...contextData,\n    latest_grain_call_id: latestGrainCall?.id || latestGrainCall?.recording_id || '',\n    latest_grain_call_date: latestGrainCall?.started_at || latestGrainCall?.created_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
+        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst grainCalls = (grainRaw?.recordings || grainRaw?.data || (Array.isArray(grainRaw) ? grainRaw : [grainRaw])).filter(c => c && (c.id || c.recording_id));\nconst notionRows = notionRaw?.results || [];\n\nconst sortedGrainCalls = [...grainCalls].sort((a, b) => new Date(a.started_at || a.created_at || 0) - new Date(b.started_at || b.created_at || 0));\n\nconst latestGrainCall = sortedGrainCalls[sortedGrainCalls.length - 1];\nconst callNumber = Math.max(notionRows.length + 1, sortedGrainCalls.length);\n\nreturn [{\n  json: {\n    ...contextData,\n    latest_grain_call_id: latestGrainCall?.id || latestGrainCall?.recording_id || '',\n    latest_grain_call_date: latestGrainCall?.started_at || latestGrainCall?.created_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
       }
     },
     {
-      "id": "http_fetch_grain_transcript",
+      "id": "a1b2c3d4-0001-4000-8000-000000000018",
       "name": "Fetch Grain Transcript",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -304,7 +283,7 @@
       }
     },
     {
-      "id": "http_create_google_doc",
+      "id": "a1b2c3d4-0001-4000-8000-000000000019",
       "name": "Create Google Doc",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -320,22 +299,22 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ title: 'Call ' + $json.new_call_number + ' – ' + $json.client_name + ' x Digital Leverage – Transcript' }) }}",
+        "jsonBody": "={{ JSON.stringify({ title: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage - Transcript' }) }}",
         "credentials": { "oAuth2Api": { "id": "", "name": "Google OAuth2" } }
       }
     },
     {
-      "id": "code_prepare_doc_write",
+      "id": "a1b2c3d4-0001-4000-8000-000000000020",
       "name": "Prepare Transcript for Doc",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [4300, 280],
       "parameters": {
-        "jsCode": "const crosscheckData = $('Cross-check Dates & Determine Call #').first().json;\nconst grainTranscript = $('Fetch Grain Transcript').first().json;\nconst createdDoc = $('Create Google Doc').first().json;\n\n// Normalise Grain transcript format\nlet transcriptText = '';\nif (Array.isArray(grainTranscript?.transcript)) {\n  transcriptText = grainTranscript.transcript\n    .map(seg => `[${seg.timestamp || seg.start || ''}] ${seg.speaker || 'Speaker'}: ${seg.text || seg.content || ''}`)\n    .join('\\n');\n} else if (Array.isArray(grainTranscript?.utterances)) {\n  transcriptText = grainTranscript.utterances\n    .map(u => `[${u.start || ''}] ${u.speaker || 'Speaker'}: ${u.text || ''}`)\n    .join('\\n');\n} else if (grainTranscript?.text) {\n  transcriptText = grainTranscript.text;\n} else {\n  transcriptText = JSON.stringify(grainTranscript, null, 2);\n}\n\nconst docId = createdDoc.documentId;\nconst docUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nreturn [{\n  json: {\n    ...crosscheckData,\n    doc_id: docId,\n    doc_url: docUrl,\n    transcript_text: transcriptText,\n    batch_update_body: {\n      requests: [{ insertText: { location: { index: 1 }, text: transcriptText } }]\n    }\n  }\n}];"
+        "jsCode": "const crosscheckData = $('Cross-check Dates and Determine Call Number').first().json;\nconst grainTranscript = $('Fetch Grain Transcript').first().json;\nconst createdDoc = $('Create Google Doc').first().json;\n\nlet transcriptText = '';\nif (Array.isArray(grainTranscript?.transcript)) {\n  transcriptText = grainTranscript.transcript.map(seg => `[${seg.timestamp || seg.start || ''}] ${seg.speaker || 'Speaker'}: ${seg.text || seg.content || ''}`).join('\\n');\n} else if (Array.isArray(grainTranscript?.utterances)) {\n  transcriptText = grainTranscript.utterances.map(u => `[${u.start || ''}] ${u.speaker || 'Speaker'}: ${u.text || ''}`).join('\\n');\n} else if (grainTranscript?.text) {\n  transcriptText = grainTranscript.text;\n} else {\n  transcriptText = JSON.stringify(grainTranscript, null, 2);\n}\n\nconst docId = createdDoc.documentId;\nconst docUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nreturn [{\n  json: {\n    ...crosscheckData,\n    doc_id: docId,\n    doc_url: docUrl,\n    transcript_text: transcriptText,\n    batch_update_body: { requests: [{ insertText: { location: { index: 1 }, text: transcriptText } }] }\n  }\n}];"
       }
     },
     {
-      "id": "http_write_transcript_to_doc",
+      "id": "a1b2c3d4-0001-4000-8000-000000000021",
       "name": "Write Transcript to Google Doc",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -356,7 +335,7 @@
       }
     },
     {
-      "id": "http_create_agendas_row",
+      "id": "a1b2c3d4-0001-4000-8000-000000000022",
       "name": "Create Call Agendas Row",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -380,7 +359,7 @@
       }
     },
     {
-      "id": "code_package_new_transcript",
+      "id": "a1b2c3d4-0001-4000-8000-000000000023",
       "name": "Package New Transcript Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -390,7 +369,7 @@
       }
     },
     {
-      "id": "http_get_latest_agenda_row",
+      "id": "a1b2c3d4-0001-4000-8000-000000000024",
       "name": "Get Latest Call Agendas Row",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -414,17 +393,17 @@
       }
     },
     {
-      "id": "code_package_existing_transcript",
+      "id": "a1b2c3d4-0001-4000-8000-000000000025",
       "name": "Package Existing Transcript Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [3460, 580],
       "parameters": {
-        "jsCode": "const contextData = $('Extract Context & Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (rows.length === 0) {\n  throw new Error(`No call agendas found for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to import the first one from Grain.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript Doc']?.url || props['Transcript Link']?.url || '';\nconst callTitle = props['Name']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`No transcript URL in the latest Call Agendas row for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to re-import.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
+        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (rows.length === 0) {\n  throw new Error(`No call agendas found for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to import from Grain.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript Doc']?.url || props['Transcript Link']?.url || '';\nconst callTitle = props['Name']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`No transcript URL in the latest Call Agendas row for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to re-import.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
       }
     },
     {
-      "id": "merge_transcript_branches",
+      "id": "a1b2c3d4-0001-4000-8000-000000000026",
       "name": "Merge Transcript Branches",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
@@ -432,7 +411,7 @@
       "parameters": { "mode": "append" }
     },
     {
-      "id": "code_select_transcript_item",
+      "id": "a1b2c3d4-0001-4000-8000-000000000027",
       "name": "Select Transcript Item",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -442,8 +421,8 @@
       }
     },
     {
-      "id": "if_specific_call_override",
-      "name": "IF: Specific Call Override?",
+      "id": "a1b2c3d4-0001-4000-8000-000000000028",
+      "name": "IF Specific Call Override",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [5980, 400],
@@ -462,7 +441,7 @@
       }
     },
     {
-      "id": "http_find_specific_call",
+      "id": "a1b2c3d4-0001-4000-8000-000000000029",
       "name": "Find Specific Call Row",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -486,17 +465,17 @@
       }
     },
     {
-      "id": "code_resolve_specific_call",
+      "id": "a1b2c3d4-0001-4000-8000-000000000030",
       "name": "Resolve Specific Call",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [6540, 260],
       "parameters": {
-        "jsCode": "const currentData = $('Select Transcript Item').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (rows.length === 0) throw new Error('Specific call not found. Check the call number or date in Notes for AI.');\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript Doc']?.url || props['Transcript Link']?.url || '';\nconst callTitle = props['Name']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) throw new Error(`No transcript URL for the requested call: ${callTitle}`);\n\nreturn [{\n  json: { ...currentData, transcript_doc_url: transcriptUrl, call_title: callTitle, source: 'specific_override' }\n}];"
+        "jsCode": "const currentData = $('Select Transcript Item').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (rows.length === 0) throw new Error('Specific call not found. Check the call number or date in Notes for AI.');\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript Doc']?.url || props['Transcript Link']?.url || '';\nconst callTitle = props['Name']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) throw new Error(`No transcript URL for the requested call: ${callTitle}`);\n\nreturn [{ json: { ...currentData, transcript_doc_url: transcriptUrl, call_title: callTitle, source: 'specific_override' } }];"
       }
     },
     {
-      "id": "merge_final_transcript",
+      "id": "a1b2c3d4-0001-4000-8000-000000000031",
       "name": "Merge Final Transcript Selection",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
@@ -504,7 +483,7 @@
       "parameters": { "mode": "append" }
     },
     {
-      "id": "code_pick_final_transcript",
+      "id": "a1b2c3d4-0001-4000-8000-000000000032",
       "name": "Pick Final Transcript",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -514,32 +493,32 @@
       }
     },
     {
-      "id": "http_fetch_transcript_content",
+      "id": "a1b2c3d4-0001-4000-8000-000000000033",
       "name": "Fetch Transcript Doc Content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [7380, 400],
       "parameters": {
         "method": "GET",
-        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.transcript_doc_url.match(/\\/d\\/([a-zA-Z0-9_-]+)/)?.[1] || 'INVALID_DOC_ID' }}",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.transcript_doc_url.match(/\\/d\\/([a-zA-Z0-9_-]+)/)?.[1] || 'INVALID' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "credentials": { "oAuth2Api": { "id": "", "name": "Google OAuth2" } }
       }
     },
     {
-      "id": "code_extract_transcript_text",
+      "id": "a1b2c3d4-0001-4000-8000-000000000034",
       "name": "Extract Transcript Text",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [7660, 400],
       "parameters": {
-        "jsCode": "const contextData = $('Pick Final Transcript').first().json;\nconst docData = $input.first().json;\n\nfunction extractDocText(doc) {\n  if (!doc.body?.content) return '';\n  let text = '';\n  for (const el of doc.body.content) {\n    if (el.paragraph) {\n      for (const e of el.paragraph.elements || []) {\n        if (e.textRun) text += e.textRun.content || '';\n      }\n    }\n  }\n  return text;\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    transcript_text: extractDocText(docData)\n  }\n}];"
+        "jsCode": "const contextData = $('Pick Final Transcript').first().json;\nconst docData = $input.first().json;\n\nfunction extractDocText(doc) {\n  if (!doc.body?.content) return '';\n  let text = '';\n  for (const el of doc.body.content) {\n    if (el.paragraph) {\n      for (const e of el.paragraph.elements || []) {\n        if (e.textRun) text += e.textRun.content || '';\n      }\n    }\n  }\n  return text;\n}\n\nreturn [{ json: { ...contextData, transcript_text: extractDocText(docData) } }];"
       }
     },
     {
-      "id": "http_format_bank_p1",
-      "name": "Query Format Bank – Pass 1",
+      "id": "a1b2c3d4-0001-4000-8000-000000000035",
+      "name": "Query Format Bank Pass 1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [7940, 400],
@@ -562,18 +541,18 @@
       }
     },
     {
-      "id": "code_prepare_mine_prompt",
+      "id": "a1b2c3d4-0001-4000-8000-000000000036",
       "name": "Prepare Mine Ideas Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [8220, 400],
       "parameters": {
-        "jsCode": "const ctx = $('Extract Transcript Text').first().json;\nconst formatBankResult = $('Query Format Bank – Pass 1').first().json;\n\nconst formatList = (formatBankResult.results || []).map(page => {\n  const p = page.properties || {};\n  return {\n    name: p['Format Name']?.title?.[0]?.plain_text || '',\n    description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n    when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n    platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter'\n  };\n}).filter(f => f.name);\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\n\\nINTELLIGENCE BRIEF:\\n${ctx.intel_brief_text}\\n\\nCONTENT STRATEGY (${ctx.total_posts_per_batch} posts/batch — LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}):\\n${ctx.strategy_doc_text}\\n\\nWRITER'S NOTES FOR THIS BATCH:\\n${ctx.notes_for_ai || 'None'}\\n\\nCALL: ${ctx.call_title || 'Most recent call'}\\n\\nFULL TRANSCRIPT:\\n${ctx.transcript_text}\\n\\n---\\nFORMAT BANK (name | description | when to use | platform):\\n${formatList.map(f => `• ${f.name} | ${f.description} | ${f.when_to_use} | ${f.platform}`).join('\\n')}\\n\\n---\\nTARGET: Generate ${ctx.transcript_idea_quota} ideas from this transcript.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. Each element:\\n{\\n  \"topic\": \"one word, two words, or one line\",\\n  \"one_of_one_opinion\": \"the unique take only this client can have\",\\n  \"content_pillar\": \"exact pillar name from the strategy doc${ctx.has_misc_pillar ? ' (Miscellaneous allowed sparingly if defined in strategy)' : ''}\",\\n  \"transcript_source\": \"direct quote or clear description of the specific moment this came from\",\\n  \"format_candidates\": [\"Format Name 1\", \"Format Name 2\", \"Format Name 3\"],\\n  \"platform_lean\": \"LinkedIn\" or \"X/Twitter\" or \"Either\",\\n  \"notes_for_reviewer\": \"flags or questions for the human reviewer, empty string if none\"\\n}`;\n\nreturn [{\n  json: {\n    ...ctx,\n    format_list: formatList,\n    mine_ideas_user_prompt: userPrompt\n  }\n}];"
+        "jsCode": "const ctx = $('Extract Transcript Text').first().json;\nconst formatBankResult = $('Query Format Bank Pass 1').first().json;\n\nconst formatList = (formatBankResult.results || []).map(page => {\n  const p = page.properties || {};\n  return {\n    name: p['Format Name']?.title?.[0]?.plain_text || '',\n    description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n    when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n    platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter'\n  };\n}).filter(f => f.name);\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\n\\nINTELLIGENCE BRIEF:\\n${ctx.intel_brief_text}\\n\\nCONTENT STRATEGY (${ctx.total_posts_per_batch} posts/batch - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}):\\n${ctx.strategy_doc_text}\\n\\nWRITER'S NOTES FOR THIS BATCH:\\n${ctx.notes_for_ai || 'None'}\\n\\nCALL: ${ctx.call_title || 'Most recent call'}\\n\\nFULL TRANSCRIPT:\\n${ctx.transcript_text}\\n\\n---\\nFORMAT BANK (name | description | when to use | platform):\\n${formatList.map(f => `- ${f.name} | ${f.description} | ${f.when_to_use} | ${f.platform}`).join('\\n')}\\n\\n---\\nTARGET: Generate ${ctx.transcript_idea_quota} ideas.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. Each element:\\n{\\n  \"topic\": \"one word, two words, or one line\",\\n  \"one_of_one_opinion\": \"the unique take only this client can have\",\\n  \"content_pillar\": \"exact pillar name from the strategy doc\",\\n  \"transcript_source\": \"direct quote or clear description of the specific moment this came from\",\\n  \"format_candidates\": [\"Format Name 1\", \"Format Name 2\", \"Format Name 3\"],\\n  \"platform_lean\": \"LinkedIn or X/Twitter or Either\",\\n  \"notes_for_reviewer\": \"flags or questions for the human reviewer, empty string if none\"\\n}`;\n\nreturn [{ json: { ...ctx, format_list: formatList, mine_ideas_user_prompt: userPrompt } }];"
       }
     },
     {
-      "id": "http_claude_mine_ideas",
-      "name": "Mine Ideas – Claude",
+      "id": "a1b2c3d4-0001-4000-8000-000000000037",
+      "name": "Mine Ideas Claude",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [8500, 400],
@@ -591,23 +570,23 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 8000, system: 'You are an expert content strategist specializing in extracting high-quality social media content ideas from client call transcripts. Your role is to mine transcripts for one-of-one content ideas — moments, stories, and opinions that only this specific client can authentically share.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC — one word, two words, or one line\\n2. FORMAT — a format from the Format Bank\\n3. 1-OF-1 OPINION — the unique take only this client can have\\n\\nQUALITY FILTERS — every idea must pass ALL 5:\\n1. Clear topic\\n2. Format candidate assigned\\n3. Genuine 1-of-1 opinion\\n4. Passes 365-day test: posting this every day for a year = brand is better off\\n5. Truly 1-of-1: ONLY this client could say this\\n\\nMINING RULES:\\n- Mine for specific stories, strong opinions, unique experiences, numbers, turning points, surprising moments\\n- Approve/reject signals: if the client seemed unenthusiastic about a direction on the call → discard it\\n- ONE golden nugget per idea. Never merge two separate insights. Never stitch together things the speaker did not explicitly connect\\n- Preserve the original thought. Do NOT over-synthesize\\n- ICP relevance: ideas must connect to the audience\\'s needs, not internal logistics or content strategy discussions\\n\\nCONTENT PILLAR RULES:\\n- Every idea MUST tie to a content pillar listed in the strategy\\n- No pillar = no idea\\n- Miscellaneous is ONLY allowed if explicitly defined in the strategy, and only sparingly\\n\\nANTI-HALLUCINATION RULES:\\n- Every idea must be traceable to a real, specific moment in the transcript\\n- Include a direct quote or clear reference to where it came from\\n- Never invent conclusions the client did not explicitly state\\n- Never combine two separate thoughts into one\\n\\nBATCH VARIETY:\\n- Aim for a mix: education, personal stories, building in public, news\\n- Prioritize the strongest ideas — do not force balance at the expense of quality\\n- Consider platform when selecting format candidates\\n\\nReturn ONLY valid JSON. No preamble, no markdown, no explanation.', messages: [{ role: 'user', content: $json.mine_ideas_user_prompt }] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 8000, system: 'You are an expert content strategist specializing in extracting high-quality social media content ideas from client call transcripts. Your role is to mine transcripts for one-of-one content ideas - moments, stories, and opinions that only this specific client can authentically share.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC - one word, two words, or one line\\n2. FORMAT - a format from the Format Bank\\n3. 1-OF-1 OPINION - the unique take only this client can have\\n\\nQUALITY FILTERS - every idea must pass ALL 5:\\n1. Clear topic\\n2. Format candidate assigned\\n3. Genuine 1-of-1 opinion\\n4. Passes 365-day test: posting this every day for a year = brand is better off\\n5. Truly 1-of-1: ONLY this client could say this\\n\\nMINING RULES:\\n- Mine for specific stories, strong opinions, unique experiences, numbers, turning points\\n- Approve/reject signals: if the client seemed unenthusiastic about a direction on the call, discard it\\n- ONE golden nugget per idea. Never merge two separate insights\\n- Preserve the original thought. Do NOT over-synthesize\\n- ICP relevance: ideas must connect to the audience needs, not internal logistics\\n\\nCONTENT PILLAR RULES:\\n- Every idea MUST tie to a content pillar listed in the strategy\\n- No pillar = no idea\\n- Miscellaneous is ONLY allowed if explicitly defined in the strategy, and only sparingly\\n\\nANTI-HALLUCINATION RULES:\\n- Every idea must be traceable to a real, specific moment in the transcript\\n- Never invent conclusions the client did not explicitly state\\n- Never combine two separate thoughts into one\\n\\nReturn ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.mine_ideas_user_prompt }] }) }}",
         "credentials": { "httpHeaderAuth": { "id": "", "name": "Anthropic API" } }
       }
     },
     {
-      "id": "code_parse_ideas",
-      "name": "Parse Ideas & Extract Format Names",
+      "id": "a1b2c3d4-0001-4000-8000-000000000038",
+      "name": "Parse Ideas and Extract Format Names",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [8780, 400],
       "parameters": {
-        "jsCode": "const ctx = $('Prepare Mine Ideas Context').first().json;\nconst claudeResponse = $input.first().json;\n\nconst content = claudeResponse.content?.[0]?.text || '';\n\nlet ideas = [];\ntry {\n  const match = content.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  ideas = JSON.parse(match ? match[0] : content);\n} catch (e) {\n  throw new Error('Failed to parse ideas from Claude. Response: ' + content.substring(0, 500));\n}\n\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  throw new Error('Claude returned no ideas. Response: ' + content.substring(0, 500));\n}\n\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\n\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames } }];"
+        "jsCode": "const ctx = $('Prepare Mine Ideas Context').first().json;\nconst content = $input.first().json.content?.[0]?.text || '';\n\nlet ideas = [];\ntry {\n  const match = content.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  ideas = JSON.parse(match ? match[0] : content);\n} catch (e) {\n  throw new Error('Failed to parse ideas from Claude. Response: ' + content.substring(0, 500));\n}\n\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  throw new Error('Claude returned no ideas. Response: ' + content.substring(0, 500));\n}\n\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\n\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames } }];"
       }
     },
     {
-      "id": "http_format_bank_p2",
-      "name": "Query Format Bank – Pass 2 (Examples)",
+      "id": "a1b2c3d4-0001-4000-8000-000000000039",
+      "name": "Query Format Bank Pass 2 Examples",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [9060, 400],
@@ -630,18 +609,18 @@
       }
     },
     {
-      "id": "code_prepare_finalize_prompt",
+      "id": "a1b2c3d4-0001-4000-8000-000000000040",
       "name": "Prepare Finalize Ideas Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [9340, 400],
       "parameters": {
-        "jsCode": "const ctx = $('Parse Ideas & Extract Format Names').first().json;\nconst formatExamples = $('Query Format Bank – Pass 2 (Examples)').first().json;\n\nconst examplesMap = {};\n(formatExamples.results || []).forEach(page => {\n  const p = page.properties || {};\n  const name = p['Format Name']?.title?.[0]?.plain_text || '';\n  if (name) {\n    examplesMap[name] = {\n      name,\n      description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n      when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n      platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter',\n      example_1: p['Example 1']?.rich_text?.[0]?.plain_text || '',\n      example_2: p['Example 2']?.rich_text?.[0]?.plain_text || '',\n      example_3: p['Example 3']?.rich_text?.[0]?.plain_text || ''\n    };\n  }\n});\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\nBATCH: ${ctx.total_posts_per_batch} posts — LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}\\nWRITER'S NOTES: ${ctx.notes_for_ai || 'None'}\\n\\nFORMAT EXAMPLES:\\n${JSON.stringify(examplesMap, null, 2)}\\n\\nIDEAS TO FINALIZE:\\n${JSON.stringify(ctx.raw_ideas, null, 2)}\\n\\nFor each idea: review examples, confirm or upgrade the format, assign final platform, run quality checklist.\\nRemove any ideas that fail the checklist and cannot be fixed.\\n\\nReturn ONLY valid JSON array. Each element:\\n{\\n  \"idea\": \"1-sentence summary\",\\n  \"topic\": \"±5 words\",\\n  \"one_of_one_opinion\": \"unique take\",\\n  \"content_pillar\": \"exact pillar name\",\\n  \"format\": \"exact format name from Format Bank\",\\n  \"platform\": \"LinkedIn\" or \"X/Twitter\",\\n  \"sources\": \"direct quotes from transcript + explanation of why this works\",\\n  \"notes_for_reviewer\": \"AI flags for human reviewer, empty string if none\",\\n  \"passes_checklist\": true or false,\\n  \"checklist_issues\": \"describe issues if false, empty string if true\"\\n}`;\n\nreturn [{ json: { ...ctx, examples_map: examplesMap, finalize_user_prompt: userPrompt } }];"
+        "jsCode": "const ctx = $('Parse Ideas and Extract Format Names').first().json;\nconst formatExamples = $('Query Format Bank Pass 2 Examples').first().json;\n\nconst examplesMap = {};\n(formatExamples.results || []).forEach(page => {\n  const p = page.properties || {};\n  const name = p['Format Name']?.title?.[0]?.plain_text || '';\n  if (name) {\n    examplesMap[name] = {\n      name,\n      description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n      when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n      platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter',\n      example_1: p['Example 1']?.rich_text?.[0]?.plain_text || '',\n      example_2: p['Example 2']?.rich_text?.[0]?.plain_text || '',\n      example_3: p['Example 3']?.rich_text?.[0]?.plain_text || ''\n    };\n  }\n});\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\nBATCH: ${ctx.total_posts_per_batch} posts - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}\\nWRITER'S NOTES: ${ctx.notes_for_ai || 'None'}\\n\\nFORMAT EXAMPLES:\\n${JSON.stringify(examplesMap, null, 2)}\\n\\nIDEAS TO FINALIZE:\\n${JSON.stringify(ctx.raw_ideas, null, 2)}\\n\\nFor each idea: review examples, confirm or upgrade the format, assign final platform, run quality checklist. Remove ideas that fail and cannot be fixed.\\n\\nReturn ONLY valid JSON array. Each element:\\n{\\n  \"idea\": \"1-sentence summary\",\\n  \"topic\": \"plus or minus 5 words\",\\n  \"one_of_one_opinion\": \"unique take\",\\n  \"content_pillar\": \"exact pillar name\",\\n  \"format\": \"exact format name from Format Bank\",\\n  \"platform\": \"LinkedIn or X/Twitter\",\\n  \"sources\": \"direct quotes from transcript plus explanation of why this works\",\\n  \"notes_for_reviewer\": \"AI flags for human reviewer, empty string if none\",\\n  \"passes_checklist\": true or false,\\n  \"checklist_issues\": \"describe issues if false, empty string if true\"\\n}`;\n\nreturn [{ json: { ...ctx, examples_map: examplesMap, finalize_user_prompt: userPrompt } }];"
       }
     },
     {
-      "id": "http_claude_finalize",
-      "name": "Finalize Ideas – Claude",
+      "id": "a1b2c3d4-0001-4000-8000-000000000041",
+      "name": "Finalize Ideas Claude",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [9620, 400],
@@ -659,22 +638,22 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 10000, system: 'You are an expert content strategist finalizing a set of content ideas. You confirm the best format using the examples provided, assign platform, and run the full quality checklist on every idea.\\n\\nQUALITY CHECKLIST — every idea must pass ALL 5:\\n1. Has a clear topic\\n2. Has a format assigned\\n3. Has a genuine 1-of-1 opinion (only this client could say this)\\n4. Passes the 365-day test\\n5. Is truly 1-of-1\\n\\nANTI-HALLUCINATION CHECKS:\\n- Every idea must trace back to a real transcript moment\\n- No merged insights — two separate thoughts stay separate\\n- No made-up conclusions\\n- Sources column must contain real evidence\\n\\nFORMAT SELECTION:\\n- Review the examples carefully. Confirm or upgrade the format based on what the examples show\\n- Formats are building blocks — note in the idea if two formats can be combined\\n- Ensure variety across the batch: mix of lengths (short/medium/long) and format types\\n\\nPLATFORM ASSIGNMENT:\\n- Use format\\'s Platform field as primary guide\\n- For LinkedIn & X/Twitter formats, assign based on cadence split\\n\\nRemove ideas that fail the checklist and cannot be fixed. Do not output low-quality ideas.\\n\\nReturn ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.finalize_user_prompt }] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 10000, system: 'You are an expert content strategist finalizing a set of content ideas. You confirm the best format using the examples provided, assign platform, and run the full quality checklist on every idea.\\n\\nQUALITY CHECKLIST - every idea must pass ALL 5:\\n1. Has a clear topic\\n2. Has a format assigned\\n3. Has a genuine 1-of-1 opinion (only this client could say this)\\n4. Passes the 365-day test\\n5. Is truly 1-of-1\\n\\nANTI-HALLUCINATION CHECKS:\\n- Every idea must trace back to a real transcript moment\\n- No merged insights\\n- No made-up conclusions\\n- Sources column must contain real evidence\\n\\nFORMAT SELECTION:\\n- Review the examples carefully. Confirm or upgrade based on what the examples show\\n- Formats are building blocks - note if two can be combined\\n- Ensure variety across the batch: mix of lengths and format types\\n\\nPLATFORM ASSIGNMENT:\\n- Use format Platform field as primary guide\\n- For LinkedIn and X/Twitter formats, assign based on cadence split\\n\\nRemove ideas that fail the checklist and cannot be fixed.\\n\\nReturn ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.finalize_user_prompt }] }) }}",
         "credentials": { "httpHeaderAuth": { "id": "", "name": "Anthropic API" } }
       }
     },
     {
-      "id": "code_parse_final_ideas",
+      "id": "a1b2c3d4-0001-4000-8000-000000000042",
       "name": "Parse Final Ideas",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [9900, 400],
       "parameters": {
-        "jsCode": "const ctx = $('Prepare Finalize Ideas Context').first().json;\nconst content = $input.first().json.content?.[0]?.text || '';\n\nlet finalIdeas = [];\ntry {\n  const match = content.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  finalIdeas = JSON.parse(match ? match[0] : content);\n} catch (e) {\n  throw new Error('Failed to parse finalized ideas. Response: ' + content.substring(0, 500));\n}\n\nconst passedIdeas = finalIdeas.filter(i => i.passes_checklist !== false);\n\nif (passedIdeas.length === 0) {\n  throw new Error('No ideas passed the quality checklist. Review the transcript quality and try again.');\n}\n\nreturn [{\n  json: {\n    ...ctx,\n    final_ideas: passedIdeas,\n    total_ideas: passedIdeas.length\n  }\n}];"
+        "jsCode": "const ctx = $('Prepare Finalize Ideas Context').first().json;\nconst content = $input.first().json.content?.[0]?.text || '';\n\nlet finalIdeas = [];\ntry {\n  const match = content.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  finalIdeas = JSON.parse(match ? match[0] : content);\n} catch (e) {\n  throw new Error('Failed to parse finalized ideas. Response: ' + content.substring(0, 500));\n}\n\nconst passedIdeas = finalIdeas.filter(i => i.passes_checklist !== false);\n\nif (passedIdeas.length === 0) {\n  throw new Error('No ideas passed the quality checklist. Review the transcript quality and try again.');\n}\n\nreturn [{ json: { ...ctx, final_ideas: passedIdeas, total_ideas: passedIdeas.length } }];"
       }
     },
     {
-      "id": "http_count_batches",
+      "id": "a1b2c3d4-0001-4000-8000-000000000043",
       "name": "Count Existing Batches",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -698,17 +677,17 @@
       }
     },
     {
-      "id": "code_build_batch_name",
+      "id": "a1b2c3d4-0001-4000-8000-000000000044",
       "name": "Build Batch Name",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [10460, 400],
       "parameters": {
-        "jsCode": "const ctx = $('Parse Final Ideas').first().json;\nconst existingBatches = $input.first().json?.results || [];\nconst nextBatchNumber = existingBatches.length + 1;\nconst batchName = `Batch ${nextBatchNumber}. ${ctx.call_sign} x ${ctx.total_posts_per_batch}`;\n\nreturn [{ json: { ...ctx, batch_number: nextBatchNumber, batch_name: batchName } }];"
+        "jsCode": "const ctx = $('Parse Final Ideas').first().json;\nconst existingBatches = $input.first().json?.results || [];\nconst nextBatchNumber = existingBatches.length + 1;\nconst batchName = `Batch ${nextBatchNumber}. ${ctx.call_sign} x ${ctx.total_posts_per_batch}`;\nreturn [{ json: { ...ctx, batch_number: nextBatchNumber, batch_name: batchName } }];"
       }
     },
     {
-      "id": "http_create_batch_page",
+      "id": "a1b2c3d4-0001-4000-8000-000000000045",
       "name": "Create Batch Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -732,7 +711,7 @@
       }
     },
     {
-      "id": "http_create_post_lineup_db",
+      "id": "a1b2c3d4-0001-4000-8000-000000000046",
       "name": "Create Post Lineup Overview DB",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -751,22 +730,22 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $('Create Batch Page').first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Post Lineup Overview' } }], properties: { Idea: { title: {} }, Status: { select: { options: [ { name: 'For Review', color: 'yellow' }, { name: 'Approved', color: 'green' }, { name: 'In Progress', color: 'blue' }, { name: 'Scheduled', color: 'purple' }, { name: 'Published', color: 'gray' } ] } }, Platform: { select: { options: [ { name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' } ] } }, Format: { rich_text: {} }, 'Content Pillar': { select: { options: [] } }, Topic: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $('Create Batch Page').first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Post Lineup Overview' } }], properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'yellow' }, { name: 'Approved', color: 'green' }, { name: 'In Progress', color: 'blue' }, { name: 'Scheduled', color: 'purple' }, { name: 'Published', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, Format: { rich_text: {} }, 'Content Pillar': { select: { options: [] } }, Topic: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
         "credentials": { "httpHeaderAuth": { "id": "", "name": "Notion API" } }
       }
     },
     {
-      "id": "code_prep_idea_loop",
+      "id": "a1b2c3d4-0001-4000-8000-000000000047",
       "name": "Prep Ideas for Loop",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [11300, 400],
       "parameters": {
-        "jsCode": "const ctx = $('Build Batch Name').first().json;\nconst batchPage = $('Create Batch Page').first().json;\nconst postLineupDb = $('Create Post Lineup Overview DB').first().json;\n\nconst batchPageId = batchPage.id;\nconst batchPageUrl = batchPage.url || `https://notion.so/${batchPageId.replace(/-/g, '')}`;\nconst postLineupDbId = postLineupDb.id;\n\n// Store in static data for the Slack node to access after loop\nconst staticData = $getWorkflowStaticData('global');\nstaticData.batchContext = {\n  batch_page_id: batchPageId,\n  batch_page_url: batchPageUrl,\n  batch_name: ctx.batch_name,\n  client_name: ctx.client_name,\n  call_title: ctx.call_title || 'Latest Call',\n  total_posts_per_batch: ctx.total_posts_per_batch\n};\nstaticData.createdRows = [];\n\nreturn ctx.final_ideas.map((idea, index) => ({\n  json: {\n    ...idea,\n    post_lineup_db_id: postLineupDbId,\n    batch_page_id: batchPageId,\n    batch_page_url: batchPageUrl,\n    batch_name: ctx.batch_name,\n    client_name: ctx.client_name,\n    idea_index: index\n  },\n  pairedItem: { item: 0 }\n}));"
+        "jsCode": "const ctx = $('Build Batch Name').first().json;\nconst batchPage = $('Create Batch Page').first().json;\nconst postLineupDb = $('Create Post Lineup Overview DB').first().json;\n\nconst batchPageId = batchPage.id;\nconst batchPageUrl = batchPage.url || `https://notion.so/${batchPageId.replace(/-/g, '')}`;\nconst postLineupDbId = postLineupDb.id;\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.batchContext = {\n  batch_page_id: batchPageId,\n  batch_page_url: batchPageUrl,\n  batch_name: ctx.batch_name,\n  client_name: ctx.client_name,\n  call_title: ctx.call_title || 'Latest Call',\n  total_posts_per_batch: ctx.total_posts_per_batch\n};\nstaticData.createdRows = [];\n\nreturn ctx.final_ideas.map((idea, index) => ({\n  json: {\n    ...idea,\n    post_lineup_db_id: postLineupDbId,\n    batch_page_id: batchPageId,\n    batch_page_url: batchPageUrl,\n    batch_name: ctx.batch_name,\n    client_name: ctx.client_name,\n    idea_index: index\n  },\n  pairedItem: { item: 0 }\n}));"
       }
     },
     {
-      "id": "split_ideas",
+      "id": "a1b2c3d4-0001-4000-8000-000000000048",
       "name": "Split Ideas",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
@@ -774,7 +753,7 @@
       "parameters": { "batchSize": 1, "options": {} }
     },
     {
-      "id": "http_create_idea_row",
+      "id": "a1b2c3d4-0001-4000-8000-000000000049",
       "name": "Create Idea Row",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -798,7 +777,7 @@
       }
     },
     {
-      "id": "code_accumulate_rows",
+      "id": "a1b2c3d4-0001-4000-8000-000000000050",
       "name": "Accumulate Created Rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -808,17 +787,17 @@
       }
     },
     {
-      "id": "code_build_slack_message",
+      "id": "a1b2c3d4-0001-4000-8000-000000000051",
       "name": "Build Slack Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [11860, 260],
       "parameters": {
-        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst ctx = staticData.batchContext || {};\nconst rows = staticData.createdRows || [];\n\nconst topIdeas = rows.slice(0, 5)\n  .map((r, i) => `${i + 1}. *[${r.platform}]* ${r.idea}`)\n  .join('\\n');\n\nconst topNotes = rows\n  .filter(r => r.notes_for_reviewer?.trim())\n  .slice(0, 3)\n  .map(r => `• ${r.notes_for_reviewer}`)\n  .join('\\n');\n\nconst message = `:brain: *New Idea Batch Ready for Review!* <!channel>\\n\\n*Client:* ${ctx.client_name}\\n*Batch:* ${ctx.batch_name}\\n*Source:* Call Transcript — ${ctx.call_title}\\n*Total Ideas:* ${rows.length}\\n\\n*Top Ideas:*\\n${topIdeas}${topNotes ? `\\n\\n*AI Notes to Review:*\\n${topNotes}` : ''}\\n\\n<${ctx.batch_page_url}|View Batch in Notion>`;\n\nreturn [{\n  json: {\n    slack_message: message,\n    batch_page_url: ctx.batch_page_url,\n    batch_name: ctx.batch_name,\n    client_name: ctx.client_name,\n    total_ideas: rows.length\n  }\n}];"
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst ctx = staticData.batchContext || {};\nconst rows = staticData.createdRows || [];\n\nconst topIdeas = rows.slice(0, 5).map((r, i) => `${i + 1}. *[${r.platform}]* ${r.idea}`).join('\\n');\nconst topNotes = rows.filter(r => r.notes_for_reviewer?.trim()).slice(0, 3).map(r => `- ${r.notes_for_reviewer}`).join('\\n');\n\nconst message = `:brain: *New Idea Batch Ready for Review!* <!channel>\\n\\n*Client:* ${ctx.client_name}\\n*Batch:* ${ctx.batch_name}\\n*Source:* Call Transcript - ${ctx.call_title}\\n*Total Ideas:* ${rows.length}\\n\\n*Top Ideas:*\\n${topIdeas}${topNotes ? `\\n\\n*AI Notes to Review:*\\n${topNotes}` : ''}\\n\\n<${ctx.batch_page_url}|View Batch in Notion>`;\n\nreturn [{ json: { slack_message: message, batch_page_url: ctx.batch_page_url, batch_name: ctx.batch_name, client_name: ctx.client_name, total_ideas: rows.length } }];"
       }
     },
     {
-      "id": "http_send_slack",
+      "id": "a1b2c3d4-0001-4000-8000-000000000052",
       "name": "Send Slack Notification",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
@@ -839,7 +818,7 @@
       }
     },
     {
-      "id": "set_return_success",
+      "id": "a1b2c3d4-0001-4000-8000-000000000053",
       "name": "Return Success",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3,
@@ -859,183 +838,73 @@
     }
   ],
   "connections": {
-    "Receive from Orchestrator": {
-      "main": [[{ "node": "Pre-process Inputs", "type": "main", "index": 0 }]]
-    },
-    "Pre-process Inputs": {
-      "main": [[{ "node": "Find Client Dashboard", "type": "main", "index": 0 }]]
-    },
-    "Find Client Dashboard": {
-      "main": [[{ "node": "Extract Dashboard Info", "type": "main", "index": 0 }]]
-    },
-    "Extract Dashboard Info": {
-      "main": [[{ "node": "List Dashboard Child Blocks", "type": "main", "index": 0 }]]
-    },
-    "List Dashboard Child Blocks": {
-      "main": [[{ "node": "Extract Client DB IDs", "type": "main", "index": 0 }]]
-    },
-    "Extract Client DB IDs": {
-      "main": [[
-        { "node": "Find Intelligence Brief Page", "type": "main", "index": 0 },
-        { "node": "Find Content Strategy Doc Page", "type": "main", "index": 0 }
-      ]]
-    },
-    "Find Intelligence Brief Page": {
-      "main": [[{ "node": "Resolve Page IDs", "type": "main", "index": 0 }]]
-    },
-    "Find Content Strategy Doc Page": {
-      "main": [[{ "node": "Resolve Page IDs", "type": "main", "index": 1 }]]
-    },
-    "Resolve Page IDs": {
-      "main": [[
-        { "node": "Fetch Intelligence Brief", "type": "main", "index": 0 },
-        { "node": "Fetch Content Strategy Doc", "type": "main", "index": 0 }
-      ]]
-    },
-    "Fetch Intelligence Brief": {
-      "main": [[{ "node": "Extract Context & Calculate Quota", "type": "main", "index": 0 }]]
-    },
-    "Fetch Content Strategy Doc": {
-      "main": [[{ "node": "Extract Context & Calculate Quota", "type": "main", "index": 1 }]]
-    },
-    "Extract Context & Calculate Quota": {
-      "main": [[{ "node": "IF: Fetch Latest Transcript?", "type": "main", "index": 0 }]]
-    },
-    "IF: Fetch Latest Transcript?": {
+    "Receive from Orchestrator": { "main": [[{ "node": "Pre-process Inputs", "type": "main", "index": 0 }]] },
+    "Pre-process Inputs": { "main": [[{ "node": "Find Client Dashboard", "type": "main", "index": 0 }]] },
+    "Find Client Dashboard": { "main": [[{ "node": "Extract Dashboard Info", "type": "main", "index": 0 }]] },
+    "Extract Dashboard Info": { "main": [[{ "node": "List Dashboard Child Blocks", "type": "main", "index": 0 }]] },
+    "List Dashboard Child Blocks": { "main": [[{ "node": "Extract Client DB IDs", "type": "main", "index": 0 }]] },
+    "Extract Client DB IDs": { "main": [[{ "node": "Find Intelligence Brief Page", "type": "main", "index": 0 }, { "node": "Find Content Strategy Doc Page", "type": "main", "index": 0 }]] },
+    "Find Intelligence Brief Page": { "main": [[{ "node": "Resolve Page IDs", "type": "main", "index": 0 }]] },
+    "Find Content Strategy Doc Page": { "main": [[{ "node": "Resolve Page IDs", "type": "main", "index": 1 }]] },
+    "Resolve Page IDs": { "main": [[{ "node": "Fetch Intelligence Brief", "type": "main", "index": 0 }, { "node": "Fetch Content Strategy Doc", "type": "main", "index": 0 }]] },
+    "Fetch Intelligence Brief": { "main": [[{ "node": "Extract Context and Calculate Quota", "type": "main", "index": 0 }]] },
+    "Fetch Content Strategy Doc": { "main": [[{ "node": "Extract Context and Calculate Quota", "type": "main", "index": 1 }]] },
+    "Extract Context and Calculate Quota": { "main": [[{ "node": "IF Fetch Latest Transcript", "type": "main", "index": 0 }]] },
+    "IF Fetch Latest Transcript": {
       "main": [
-        [
-          { "node": "Query Grain – All Calls", "type": "main", "index": 0 },
-          { "node": "Query Call Agendas (for cross-check)", "type": "main", "index": 0 }
-        ],
+        [{ "node": "Query Grain All Calls", "type": "main", "index": 0 }, { "node": "Query Call Agendas for Cross-check", "type": "main", "index": 0 }],
         [{ "node": "Get Latest Call Agendas Row", "type": "main", "index": 0 }]
       ]
     },
-    "Query Grain – All Calls": {
-      "main": [[{ "node": "Merge Grain + Agendas", "type": "main", "index": 0 }]]
-    },
-    "Query Call Agendas (for cross-check)": {
-      "main": [[{ "node": "Merge Grain + Agendas", "type": "main", "index": 1 }]]
-    },
-    "Merge Grain + Agendas": {
-      "main": [[{ "node": "Cross-check Dates & Determine Call #", "type": "main", "index": 0 }]]
-    },
-    "Cross-check Dates & Determine Call #": {
-      "main": [[
-        { "node": "Fetch Grain Transcript", "type": "main", "index": 0 },
-        { "node": "Create Google Doc", "type": "main", "index": 0 }
-      ]]
-    },
-    "Fetch Grain Transcript": {
-      "main": [[{ "node": "Prepare Transcript for Doc", "type": "main", "index": 0 }]]
-    },
-    "Create Google Doc": {
-      "main": [[{ "node": "Prepare Transcript for Doc", "type": "main", "index": 1 }]]
-    },
-    "Prepare Transcript for Doc": {
-      "main": [[{ "node": "Write Transcript to Google Doc", "type": "main", "index": 0 }]]
-    },
-    "Write Transcript to Google Doc": {
-      "main": [[{ "node": "Create Call Agendas Row", "type": "main", "index": 0 }]]
-    },
-    "Create Call Agendas Row": {
-      "main": [[{ "node": "Package New Transcript Data", "type": "main", "index": 0 }]]
-    },
-    "Package New Transcript Data": {
-      "main": [[{ "node": "Merge Transcript Branches", "type": "main", "index": 0 }]]
-    },
-    "Get Latest Call Agendas Row": {
-      "main": [[{ "node": "Package Existing Transcript Data", "type": "main", "index": 0 }]]
-    },
-    "Package Existing Transcript Data": {
-      "main": [[{ "node": "Merge Transcript Branches", "type": "main", "index": 1 }]]
-    },
-    "Merge Transcript Branches": {
-      "main": [[{ "node": "Select Transcript Item", "type": "main", "index": 0 }]]
-    },
-    "Select Transcript Item": {
-      "main": [[{ "node": "IF: Specific Call Override?", "type": "main", "index": 0 }]]
-    },
-    "IF: Specific Call Override?": {
+    "Query Grain All Calls": { "main": [[{ "node": "Merge Grain and Agendas", "type": "main", "index": 0 }]] },
+    "Query Call Agendas for Cross-check": { "main": [[{ "node": "Merge Grain and Agendas", "type": "main", "index": 1 }]] },
+    "Merge Grain and Agendas": { "main": [[{ "node": "Cross-check Dates and Determine Call Number", "type": "main", "index": 0 }]] },
+    "Cross-check Dates and Determine Call Number": { "main": [[{ "node": "Fetch Grain Transcript", "type": "main", "index": 0 }, { "node": "Create Google Doc", "type": "main", "index": 0 }]] },
+    "Fetch Grain Transcript": { "main": [[{ "node": "Prepare Transcript for Doc", "type": "main", "index": 0 }]] },
+    "Create Google Doc": { "main": [[{ "node": "Prepare Transcript for Doc", "type": "main", "index": 1 }]] },
+    "Prepare Transcript for Doc": { "main": [[{ "node": "Write Transcript to Google Doc", "type": "main", "index": 0 }]] },
+    "Write Transcript to Google Doc": { "main": [[{ "node": "Create Call Agendas Row", "type": "main", "index": 0 }]] },
+    "Create Call Agendas Row": { "main": [[{ "node": "Package New Transcript Data", "type": "main", "index": 0 }]] },
+    "Package New Transcript Data": { "main": [[{ "node": "Merge Transcript Branches", "type": "main", "index": 0 }]] },
+    "Get Latest Call Agendas Row": { "main": [[{ "node": "Package Existing Transcript Data", "type": "main", "index": 0 }]] },
+    "Package Existing Transcript Data": { "main": [[{ "node": "Merge Transcript Branches", "type": "main", "index": 1 }]] },
+    "Merge Transcript Branches": { "main": [[{ "node": "Select Transcript Item", "type": "main", "index": 0 }]] },
+    "Select Transcript Item": { "main": [[{ "node": "IF Specific Call Override", "type": "main", "index": 0 }]] },
+    "IF Specific Call Override": {
       "main": [
         [{ "node": "Find Specific Call Row", "type": "main", "index": 0 }],
         [{ "node": "Merge Final Transcript Selection", "type": "main", "index": 1 }]
       ]
     },
-    "Find Specific Call Row": {
-      "main": [[{ "node": "Resolve Specific Call", "type": "main", "index": 0 }]]
-    },
-    "Resolve Specific Call": {
-      "main": [[{ "node": "Merge Final Transcript Selection", "type": "main", "index": 0 }]]
-    },
-    "Merge Final Transcript Selection": {
-      "main": [[{ "node": "Pick Final Transcript", "type": "main", "index": 0 }]]
-    },
-    "Pick Final Transcript": {
-      "main": [[{ "node": "Fetch Transcript Doc Content", "type": "main", "index": 0 }]]
-    },
-    "Fetch Transcript Doc Content": {
-      "main": [[{ "node": "Extract Transcript Text", "type": "main", "index": 0 }]]
-    },
-    "Extract Transcript Text": {
-      "main": [[{ "node": "Query Format Bank – Pass 1", "type": "main", "index": 0 }]]
-    },
-    "Query Format Bank – Pass 1": {
-      "main": [[{ "node": "Prepare Mine Ideas Context", "type": "main", "index": 0 }]]
-    },
-    "Prepare Mine Ideas Context": {
-      "main": [[{ "node": "Mine Ideas – Claude", "type": "main", "index": 0 }]]
-    },
-    "Mine Ideas – Claude": {
-      "main": [[{ "node": "Parse Ideas & Extract Format Names", "type": "main", "index": 0 }]]
-    },
-    "Parse Ideas & Extract Format Names": {
-      "main": [[{ "node": "Query Format Bank – Pass 2 (Examples)", "type": "main", "index": 0 }]]
-    },
-    "Query Format Bank – Pass 2 (Examples)": {
-      "main": [[{ "node": "Prepare Finalize Ideas Context", "type": "main", "index": 0 }]]
-    },
-    "Prepare Finalize Ideas Context": {
-      "main": [[{ "node": "Finalize Ideas – Claude", "type": "main", "index": 0 }]]
-    },
-    "Finalize Ideas – Claude": {
-      "main": [[{ "node": "Parse Final Ideas", "type": "main", "index": 0 }]]
-    },
-    "Parse Final Ideas": {
-      "main": [[{ "node": "Count Existing Batches", "type": "main", "index": 0 }]]
-    },
-    "Count Existing Batches": {
-      "main": [[{ "node": "Build Batch Name", "type": "main", "index": 0 }]]
-    },
-    "Build Batch Name": {
-      "main": [[{ "node": "Create Batch Page", "type": "main", "index": 0 }]]
-    },
-    "Create Batch Page": {
-      "main": [[{ "node": "Create Post Lineup Overview DB", "type": "main", "index": 0 }]]
-    },
-    "Create Post Lineup Overview DB": {
-      "main": [[{ "node": "Prep Ideas for Loop", "type": "main", "index": 0 }]]
-    },
-    "Prep Ideas for Loop": {
-      "main": [[{ "node": "Split Ideas", "type": "main", "index": 0 }]]
-    },
+    "Find Specific Call Row": { "main": [[{ "node": "Resolve Specific Call", "type": "main", "index": 0 }]] },
+    "Resolve Specific Call": { "main": [[{ "node": "Merge Final Transcript Selection", "type": "main", "index": 0 }]] },
+    "Merge Final Transcript Selection": { "main": [[{ "node": "Pick Final Transcript", "type": "main", "index": 0 }]] },
+    "Pick Final Transcript": { "main": [[{ "node": "Fetch Transcript Doc Content", "type": "main", "index": 0 }]] },
+    "Fetch Transcript Doc Content": { "main": [[{ "node": "Extract Transcript Text", "type": "main", "index": 0 }]] },
+    "Extract Transcript Text": { "main": [[{ "node": "Query Format Bank Pass 1", "type": "main", "index": 0 }]] },
+    "Query Format Bank Pass 1": { "main": [[{ "node": "Prepare Mine Ideas Context", "type": "main", "index": 0 }]] },
+    "Prepare Mine Ideas Context": { "main": [[{ "node": "Mine Ideas Claude", "type": "main", "index": 0 }]] },
+    "Mine Ideas Claude": { "main": [[{ "node": "Parse Ideas and Extract Format Names", "type": "main", "index": 0 }]] },
+    "Parse Ideas and Extract Format Names": { "main": [[{ "node": "Query Format Bank Pass 2 Examples", "type": "main", "index": 0 }]] },
+    "Query Format Bank Pass 2 Examples": { "main": [[{ "node": "Prepare Finalize Ideas Context", "type": "main", "index": 0 }]] },
+    "Prepare Finalize Ideas Context": { "main": [[{ "node": "Finalize Ideas Claude", "type": "main", "index": 0 }]] },
+    "Finalize Ideas Claude": { "main": [[{ "node": "Parse Final Ideas", "type": "main", "index": 0 }]] },
+    "Parse Final Ideas": { "main": [[{ "node": "Count Existing Batches", "type": "main", "index": 0 }]] },
+    "Count Existing Batches": { "main": [[{ "node": "Build Batch Name", "type": "main", "index": 0 }]] },
+    "Build Batch Name": { "main": [[{ "node": "Create Batch Page", "type": "main", "index": 0 }]] },
+    "Create Batch Page": { "main": [[{ "node": "Create Post Lineup Overview DB", "type": "main", "index": 0 }]] },
+    "Create Post Lineup Overview DB": { "main": [[{ "node": "Prep Ideas for Loop", "type": "main", "index": 0 }]] },
+    "Prep Ideas for Loop": { "main": [[{ "node": "Split Ideas", "type": "main", "index": 0 }]] },
     "Split Ideas": {
       "main": [
         [{ "node": "Build Slack Message", "type": "main", "index": 0 }],
         [{ "node": "Create Idea Row", "type": "main", "index": 0 }]
       ]
     },
-    "Create Idea Row": {
-      "main": [[{ "node": "Accumulate Created Rows", "type": "main", "index": 0 }]]
-    },
-    "Accumulate Created Rows": {
-      "main": [[{ "node": "Split Ideas", "type": "main", "index": 0 }]]
-    },
-    "Build Slack Message": {
-      "main": [[{ "node": "Send Slack Notification", "type": "main", "index": 0 }]]
-    },
-    "Send Slack Notification": {
-      "main": [[{ "node": "Return Success", "type": "main", "index": 0 }]]
-    }
+    "Create Idea Row": { "main": [[{ "node": "Accumulate Created Rows", "type": "main", "index": 0 }]] },
+    "Accumulate Created Rows": { "main": [[{ "node": "Split Ideas", "type": "main", "index": 0 }]] },
+    "Build Slack Message": { "main": [[{ "node": "Send Slack Notification", "type": "main", "index": 0 }]] },
+    "Send Slack Notification": { "main": [[{ "node": "Return Success", "type": "main", "index": 0 }]] }
   },
   "settings": {
     "executionOrder": "v1",
