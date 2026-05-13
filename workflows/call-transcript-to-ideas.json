@@ -83,10 +83,10 @@
       "typeVersion": 2,
       "position": [
         2340,
-        400
+        300
       ],
       "parameters": {
-        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\n\n// Collect all blocks from both columns\nconst allItems = $input.all();\nconst allBlocks = allItems.flatMap(item => item.json.results || []);\n\n// Search for databases by title across all column content\nlet callAgendasId = null;\nlet masterContentId = null;\n\nfor (const block of allBlocks) {\n  if (block.type === 'child_database') {\n    const title = (block.child_database?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n  // Also handle link_to_page blocks pointing to databases\n  if (block.type === 'link_to_page' && block.link_to_page?.type === 'database_id') {\n    // We have the ID but not the title — need title lookup, skip for now\n    // Will be caught by child_database blocks\n  }\n}\n\n// Fallback: also check top-level page blocks\nif (!callAgendasId || !masterContentId) {\n  const topBlocks = ($('Fetch Dashboard Blocks').first().json?.results || []);\n  for (const block of topBlocks) {\n    if (block.type === 'child_database') {\n      const title = (block.child_database?.title || '').toLowerCase();\n      if (title.includes('call agenda')) callAgendasId = block.id;\n      if (title.includes('master content')) masterContentId = block.id;\n    }\n  }\n}\n\nif (!callAgendasId) {\n  throw new Error(`Could not find 'Call Agendas' database inside ${dashboardInfo.client_name}'s dashboard.`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' inside ${dashboardInfo.client_name}'s dashboard.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId\n  }\n}];"
+        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\n\n// Databases live inside the Navigation callout (4 levels deep)\nconst navBlocks = $input.first().json?.results || [];\n\nlet callAgendasId = null;\nlet masterContentId = null;\n\nfor (const block of navBlocks) {\n  if (block.type === 'child_database') {\n    const title = (block.child_database?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n  if (block.type === 'child_page') {\n    const title = (block.child_page?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n}\n\nif (!callAgendasId) {\n  const found = navBlocks.map(b => `${b.type}: ${b.child_database?.title || b.child_page?.title || '(no title)'}`).join(', ');\n  throw new Error(`Could not find 'Call Agendas' database in Navigation callout for ${dashboardInfo.client_name}. Found: ${found}`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' in Navigation callout for ${dashboardInfo.client_name}.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId\n  }\n}];"
       }
     },
     {
@@ -1396,17 +1396,17 @@
       }
     },
     {
-      "id": "a1b2c3d4-0001-4000-8000-000000000060",
-      "name": "Fetch Column 1 Content",
+      "id": "a1b2c3d4-0001-4000-8000-000000000062",
+      "name": "Fetch Navigation Callout Content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        1780,
-        500
+        2060,
+        300
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.results[1].id + '/children?page_size=100' }}",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.results.find(r => r.type === 'callout' && r.callout?.icon?.type !== 'emoji').id + '/children?page_size=100' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "notionApi",
         "sendHeaders": true,
@@ -1424,19 +1424,6 @@
           "id": "",
           "name": "Notion API"
         }
-      }
-    },
-    {
-      "id": "a1b2c3d4-0001-4000-8000-000000000061",
-      "name": "Merge Column Content",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        2060,
-        400
-      ],
-      "parameters": {
-        "mode": "append"
       }
     }
   ],
@@ -2096,25 +2083,14 @@
       "main": [
         [
           {
-            "node": "Merge Column Content",
+            "node": "Fetch Navigation Callout Content",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Column 1 Content": {
-      "main": [
-        [
-          {
-            "node": "Merge Column Content",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge Column Content": {
+    "Fetch Navigation Callout Content": {
       "main": [
         [
           {
