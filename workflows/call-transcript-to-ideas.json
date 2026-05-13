@@ -1,5 +1,5 @@
 {
-  "name": "📞 Call Transcript → Ideas",
+  "name": "\ud83d\udcde Call Transcript \u2192 Ideas",
   "nodes": [
     {
       "id": "a1b2c3d4-0001-4000-8000-000000000001",
@@ -468,7 +468,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "// Sequential chain: Cross-check → Create Google Doc → Fetch Grain Transcript → here\n// $input.first() = Fetch Grain Transcript plain-text response\n// Create Google Doc and Cross-check are guaranteed completed ancestors\nconst crosscheckData = $('Cross-check Dates and Determine Call Number').first().json;\nconst createdDoc = $('Create Google Doc').first().json;\n\nconst transcriptText = ($input.first().json?.data || '').trim();\n\nconst docId = createdDoc.id || createdDoc.documentId;\nif (!docId) throw new Error('doc_id missing. Create Google Doc returned: ' + JSON.stringify(createdDoc));\n\nconst docUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nreturn [{\n  json: {\n    ...crosscheckData,\n    doc_id: docId,\n    doc_url: docUrl,\n    transcript_text: transcriptText,\n    batch_update_body: { requests: [{ insertText: { location: { index: 1 }, text: transcriptText } }] }\n  }\n}];"
+        "jsCode": "// Sequential chain: Cross-check \u2192 Create Google Doc \u2192 Fetch Grain Transcript \u2192 here\n// $input.first() = Fetch Grain Transcript plain-text response\n// Create Google Doc and Cross-check are guaranteed completed ancestors\nconst crosscheckData = $('Cross-check Dates and Determine Call Number').first().json;\nconst createdDoc = $('Create Google Doc').first().json;\n\nconst transcriptText = ($input.first().json?.data || '').trim();\n\nconst docId = createdDoc.id || createdDoc.documentId;\nif (!docId) throw new Error('doc_id missing. Create Google Doc returned: ' + JSON.stringify(createdDoc));\n\nconst docUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nreturn [{\n  json: {\n    ...crosscheckData,\n    doc_id: docId,\n    doc_url: docUrl,\n    transcript_text: transcriptText,\n    batch_update_body: { requests: [{ insertText: { location: { index: 1 }, text: transcriptText } }] }\n  }\n}];"
       }
     },
     {
@@ -511,7 +511,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        4860,
+        5340,
         280
       ],
       "parameters": {
@@ -533,7 +533,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $('Extract Client DB IDs').first().json.call_agendas_db_id }, properties: { Title: { title: [{ text: { content: 'Call ' + $('Prepare Transcript for Doc').first().json.new_call_number + ' - ' + $('Prepare Transcript for Doc').first().json.client_name + ' x Digital Leverage' } }] }, 'Transcript URL': { url: $('Prepare Transcript for Doc').first().json.doc_url }, 'Call Date': { date: { start: ($('Prepare Transcript for Doc').first().json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}",
+        "jsonBody": "={{ JSON.stringify($json.row_body) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -549,7 +549,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5140,
+        5620,
         280
       ],
       "parameters": {
@@ -604,7 +604,7 @@
         580
       ],
       "parameters": {
-        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (!rows.length) {\n  throw new Error(`Call Agendas is empty for ${contextData.client_name} — should have been caught by IF node. Check IF Has Existing Transcript routing.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript URL']?.url || '';\nconst callTitle = props['Title']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`Latest Call Agendas row has no Transcript URL for: ${contextData.client_name}. Open that row in Notion and add the Google Doc link.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
+        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (!rows.length) {\n  throw new Error(`Call Agendas is empty for ${contextData.client_name} \u2014 should have been caught by IF node. Check IF Has Existing Transcript routing.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript URL']?.url || '';\nconst callTitle = props['Title']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`Latest Call Agendas row has no Transcript URL for: ${contextData.client_name}. Open that row in Notion and add the Google Doc link.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
       }
     },
     {
@@ -1476,6 +1476,50 @@
           "combinator": "and"
         }
       }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000060",
+      "name": "Get Call Agendas Schema",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4780,
+        280
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Extract Client DB IDs').first().json.call_agendas_db_id }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000061",
+      "name": "Build Row Properties from Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5060,
+        280
+      ],
+      "parameters": {
+        "jsCode": "// Dynamically discover column names from the actual Notion DB schema\nconst schema = $input.first().json;\nconst prepData = $('Prepare Transcript for Doc').first().json;\nconst dbId = $('Extract Client DB IDs').first().json.call_agendas_db_id;\n\nconst schemaProps = schema.properties || {};\n\n// Find the title property (the main column - its type is always 'title')\nconst titlePropName = Object.entries(schemaProps).find(([, v]) => v.type === 'title')?.[0] || 'Name';\n// Find a url-type property\nconst urlPropName = Object.entries(schemaProps).find(([, v]) => v.type === 'url')?.[0];\n// Find a date-type property\nconst datePropName = Object.entries(schemaProps).find(([k, v]) => v.type === 'date')?.[0];\n\nconst callNum = prepData.new_call_number || '?';\nconst clientName = prepData.client_name || '?';\nconst callDate = (prepData.latest_grain_call_date || new Date().toISOString()).split('T')[0];\nconst docUrl = prepData.doc_url;\n\n// Diagnostics logged so they appear in n8n execution log\nconsole.log(`Schema title column: \"${titlePropName}\", url column: \"${urlPropName || 'none'}\", date column: \"${datePropName || 'none'}\"`);\nconsole.log(`prepData.doc_url: ${docUrl}`);\n\nconst properties = {};\nproperties[titlePropName] = { title: [{ type: 'text', text: { content: 'Call ' + callNum + ' - ' + clientName + ' x Digital Leverage' } }] };\nif (datePropName) {\n  properties[datePropName] = { date: { start: callDate } };\n}\nif (urlPropName && docUrl) {\n  properties[urlPropName] = { url: docUrl };\n} else if (!docUrl) {\n  console.log('WARNING: doc_url missing from Prepare Transcript for Doc output - Transcript URL will not be set');\n}\n\nreturn [{ json: { row_body: { parent: { database_id: dbId }, properties } } }];"
+      }
     }
   ],
   "connections": {
@@ -1714,7 +1758,7 @@
       "main": [
         [
           {
-            "node": "Create Call Agendas Row",
+            "node": "Get Call Agendas Schema",
             "type": "main",
             "index": 0
           }
@@ -2164,6 +2208,28 @@
           },
           {
             "node": "Query Call Agendas for Cross-check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Call Agendas Schema": {
+      "main": [
+        [
+          {
+            "node": "Build Row Properties from Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Row Properties from Schema": {
+      "main": [
+        [
+          {
+            "node": "Create Call Agendas Row",
             "type": "main",
             "index": 0
           }
