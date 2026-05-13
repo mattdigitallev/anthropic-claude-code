@@ -332,7 +332,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "=https://api.notion.com/v1/databases/{{ $json.call_agendas_db_id }}/query",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.call_agendas_db_id + '/query' }}",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -349,7 +349,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ page_size: 100 }) }}",
+        "jsonBody": "={{ ({ page_size: 100 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -567,7 +567,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "=https://api.notion.com/v1/databases/{{ $json.call_agendas_db_id }}/query",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.call_agendas_db_id + '/query' }}",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -584,7 +584,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: \"Call Date\", direction: \"descending\" }], page_size: 1 }) }}",
+        "jsonBody": "={{ ({ sorts: [{ property: 'Call Date', direction: 'descending' }], page_size: 1 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -674,7 +674,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "=https://api.notion.com/v1/databases/{{ $json.call_agendas_db_id }}/query",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.call_agendas_db_id + '/query' }}",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -691,7 +691,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify(\n  $json.specific_call_ref?.type === 'call_number'\n    ? { filter: { property: 'Name', title: { contains: 'Call ' + $json.specific_call_ref.value } }, page_size: 1 }\n    : { sorts: [{ timestamp: 'created_time', direction: 'descending' }], page_size: 1 }\n) }}",
+        "jsonBody": "={{ $json.specific_call_ref?.type === 'call_number' ? ({ filter: { property: 'Name', title: { contains: 'Call ' + $json.specific_call_ref.value } }, page_size: 1 }) : ({ sorts: [{ timestamp: 'created_time', direction: 'descending' }], page_size: 1 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
