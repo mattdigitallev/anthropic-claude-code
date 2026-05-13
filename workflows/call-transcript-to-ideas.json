@@ -1038,7 +1038,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.master_content_db_id }, properties: { Name: { title: [{ text: { content: $json.batch_name } }] }, Status: { select: { name: 'Ideating' } }, 'Batch Date': { date: { start: $json.batch_date } } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.master_content_db_id }, properties: { Idea: { title: [{ text: { content: $json.batch_name } }] }, Status: { status: { name: 'Ideating' } } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
