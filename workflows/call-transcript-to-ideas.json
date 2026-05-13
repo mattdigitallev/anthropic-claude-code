@@ -82,11 +82,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1500,
+        2340,
         400
       ],
       "parameters": {
-        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\n\nconst callAgendasSearch = $('Search Call Agendas DB').first().json;\nconst masterContentSearch = $('Search Master Content DB').first().json;\n\nconst callAgendasResults = (callAgendasSearch.results || []).filter(r => r.object === 'database');\nconst masterContentResults = (masterContentSearch.results || []).filter(r => r.object === 'database');\n\nif (!callAgendasResults.length) {\n  throw new Error(`Could not find 'Call Agendas' database for ${dashboardInfo.client_name}. Check the database exists and the Notion integration has access.`);\n}\nif (!masterContentResults.length) {\n  throw new Error(`Could not find 'Master Content Database' for ${dashboardInfo.client_name}. Check the database exists and the Notion integration has access.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasResults[0].id,\n    master_content_db_id: masterContentResults[0].id\n  }\n}];"
+        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\n\n// Collect all blocks from both columns\nconst allItems = $input.all();\nconst allBlocks = allItems.flatMap(item => item.json.results || []);\n\n// Search for databases by title across all column content\nlet callAgendasId = null;\nlet masterContentId = null;\n\nfor (const block of allBlocks) {\n  if (block.type === 'child_database') {\n    const title = (block.child_database?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n  // Also handle link_to_page blocks pointing to databases\n  if (block.type === 'link_to_page' && block.link_to_page?.type === 'database_id') {\n    // We have the ID but not the title — need title lookup, skip for now\n    // Will be caught by child_database blocks\n  }\n}\n\n// Fallback: also check top-level page blocks\nif (!callAgendasId || !masterContentId) {\n  const topBlocks = ($('Fetch Dashboard Blocks').first().json?.results || []);\n  for (const block of topBlocks) {\n    if (block.type === 'child_database') {\n      const title = (block.child_database?.title || '').toLowerCase();\n      if (title.includes('call agenda')) callAgendasId = block.id;\n      if (title.includes('master content')) masterContentId = block.id;\n    }\n  }\n}\n\nif (!callAgendasId) {\n  throw new Error(`Could not find 'Call Agendas' database inside ${dashboardInfo.client_name}'s dashboard.`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' inside ${dashboardInfo.client_name}'s dashboard.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId\n  }\n}];"
       }
     },
     {
@@ -1303,17 +1303,17 @@
       }
     },
     {
-      "id": "a1b2c3d4-0001-4000-8000-000000000056",
-      "name": "Search Call Agendas DB",
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
+      "name": "Fetch Dashboard Blocks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
         1220,
-        320
+        400
       ],
       "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/search",
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.dashboard_page_id + '/children?page_size=100' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "notionApi",
         "sendHeaders": true,
@@ -1322,16 +1322,9 @@
             {
               "name": "Notion-Version",
               "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
             }
           ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\"query\":\"Call Agendas\",\"filter\":{\"value\":\"database\",\"property\":\"object\"},\"page_size\":10}"
+        }
       },
       "credentials": {
         "notionApi": {
@@ -1341,17 +1334,17 @@
       }
     },
     {
-      "id": "a1b2c3d4-0001-4000-8000-000000000057",
-      "name": "Search Master Content DB",
+      "id": "a1b2c3d4-0001-4000-8000-000000000058",
+      "name": "Fetch Column List Blocks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        1220,
-        480
+        1500,
+        400
       ],
       "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/search",
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.results.find(r => r.type === 'column_list').id + '/children?page_size=100' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "notionApi",
         "sendHeaders": true,
@@ -1360,22 +1353,90 @@
             {
               "name": "Notion-Version",
               "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
             }
           ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\"query\":\"Master Content\",\"filter\":{\"value\":\"database\",\"property\":\"object\"},\"page_size\":10}"
+        }
       },
       "credentials": {
         "notionApi": {
           "id": "",
           "name": "Notion API"
         }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000059",
+      "name": "Fetch Column 0 Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.results[0].id + '/children?page_size=100' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000060",
+      "name": "Fetch Column 1 Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        500
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.results[1].id + '/children?page_size=100' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000061",
+      "name": "Merge Column Content",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2060,
+        400
+      ],
+      "parameters": {
+        "mode": "append"
       }
     }
   ],
@@ -1417,12 +1478,7 @@
       "main": [
         [
           {
-            "node": "Search Call Agendas DB",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Search Master Content DB",
+            "node": "Fetch Dashboard Blocks",
             "type": "main",
             "index": 0
           }
@@ -2009,24 +2065,62 @@
         ]
       ]
     },
-    "Search Call Agendas DB": {
+    "Fetch Dashboard Blocks": {
       "main": [
         [
           {
-            "node": "Extract Client DB IDs",
+            "node": "Fetch Column List Blocks",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Search Master Content DB": {
+    "Fetch Column List Blocks": {
+      "main": [
+        [
+          {
+            "node": "Fetch Column 0 Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Column 1 Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Column 0 Content": {
+      "main": [
+        [
+          {
+            "node": "Merge Column Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Column 1 Content": {
+      "main": [
+        [
+          {
+            "node": "Merge Column Content",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Column Content": {
       "main": [
         [
           {
             "node": "Extract Client DB IDs",
             "type": "main",
-            "index": 1
+            "index": 0
           }
         ]
       ]
