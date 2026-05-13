@@ -346,7 +346,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sorts: [{ timestamp: \"created_time\", direction: \"descending\" }], page_size: 100 }) }}",
+        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: \"Call Date\", direction: \"descending\" }], page_size: 100 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -513,7 +513,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.call_agendas_db_id }, properties: { Name: { title: [{ text: { content: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage' } }] }, 'Transcript Doc': { url: $json.doc_url }, Date: { date: { start: ($json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.call_agendas_db_id }, properties: { Title: { title: [{ text: { content: 'Call ' + $json.new_call_number + ' - ' + $json.client_name + ' x Digital Leverage' } }] }, 'Transcript URL': { url: $json.doc_url }, 'Call Date': { date: { start: ($json.latest_grain_call_date || new Date().toISOString()).split('T')[0] } } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -564,7 +564,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ sorts: [{ timestamp: \"created_time\", direction: \"descending\" }], page_size: 1 }) }}",
+        "jsonBody": "={{ JSON.stringify({ sorts: [{ property: \"Call Date\", direction: \"descending\" }], page_size: 1 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -584,7 +584,7 @@
         580
       ],
       "parameters": {
-        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (rows.length === 0) {\n  throw new Error(`No call agendas found for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to import from Grain.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript Doc']?.url || props['Transcript Link']?.url || '';\nconst callTitle = props['Name']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`No transcript URL in the latest Call Agendas row for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to re-import.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
+        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (rows.length === 0) {\n  throw new Error(`No call agendas found for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to import from Grain.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript URL']?.url || '';\nconst callTitle = props['Title']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`No transcript URL in the latest Call Agendas row for: ${contextData.client_name}. Tick 'Fetch Latest Call Transcript' to re-import.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
       }
     },
     {
