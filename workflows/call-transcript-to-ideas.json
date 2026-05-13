@@ -396,7 +396,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "=https://api.grain.com/_/public-api/v2/recordings/{{ $json.latest_grain_call_id }}/transcript.txt",
+        "url": "={{ 'https://api.grain.com/_/public-api/v2/recordings/' + $('Cross-check Dates and Determine Call Number').first().json.latest_grain_call_id + '/transcript.txt' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -468,7 +468,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "const crosscheckData = $('Cross-check Dates and Determine Call Number').first().json;\n\n// Use named refs to direct parent nodes — reliable for immediate parents\nconst transcriptItem = $('Fetch Grain Transcript').first().json;\nconst createdDoc = $('Create Google Doc').first().json;\n\n// transcript.txt returns plain text stored in .data by n8n\nconst transcriptText = (transcriptItem.data || transcriptItem.text || '').trim();\n\nconst docId = createdDoc.id || createdDoc.documentId;\nif (!docId) throw new Error('doc_id missing. Create Google Doc returned: ' + JSON.stringify(createdDoc));\n\nconst docUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nreturn [{\n  json: {\n    ...crosscheckData,\n    doc_id: docId,\n    doc_url: docUrl,\n    transcript_text: transcriptText,\n    batch_update_body: { requests: [{ insertText: { location: { index: 1 }, text: transcriptText } }] }\n  }\n}];"
+        "jsCode": "// Sequential chain: Cross-check → Create Google Doc → Fetch Grain Transcript → here\n// $input.first() = Fetch Grain Transcript plain-text response\n// Create Google Doc and Cross-check are guaranteed completed ancestors\nconst crosscheckData = $('Cross-check Dates and Determine Call Number').first().json;\nconst createdDoc = $('Create Google Doc').first().json;\n\nconst transcriptText = ($input.first().json?.data || '').trim();\n\nconst docId = createdDoc.id || createdDoc.documentId;\nif (!docId) throw new Error('doc_id missing. Create Google Doc returned: ' + JSON.stringify(createdDoc));\n\nconst docUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nreturn [{\n  json: {\n    ...crosscheckData,\n    doc_id: docId,\n    doc_url: docUrl,\n    transcript_text: transcriptText,\n    batch_update_body: { requests: [{ insertText: { location: { index: 1 }, text: transcriptText } }] }\n  }\n}];"
       }
     },
     {
@@ -1670,12 +1670,18 @@
       "main": [
         [
           {
-            "node": "Fetch Grain Transcript",
+            "node": "Create Google Doc",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Create Google Doc": {
+      "main": [
+        [
           {
-            "node": "Create Google Doc",
+            "node": "Fetch Grain Transcript",
             "type": "main",
             "index": 0
           }
@@ -1689,17 +1695,6 @@
             "node": "Prepare Transcript for Doc",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Create Google Doc": {
-      "main": [
-        [
-          {
-            "node": "Prepare Transcript for Doc",
-            "type": "main",
-            "index": 1
           }
         ]
       ]
