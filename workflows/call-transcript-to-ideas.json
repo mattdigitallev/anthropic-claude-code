@@ -77,37 +77,6 @@
       }
     },
     {
-      "id": "a1b2c3d4-0001-4000-8000-000000000005",
-      "name": "List Dashboard Child Blocks",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        1220,
-        400
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "=https://api.notion.com/v1/blocks/{{ $json.dashboard_page_id }}/children?page_size=100",
-        "authentication": "predefinedCredentialType",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            }
-          ]
-        },
-        "nodeCredentialType": "notionApi"
-      },
-      "credentials": {
-        "notionApi": {
-          "id": "",
-          "name": "Notion API"
-        }
-      }
-    },
-    {
       "id": "a1b2c3d4-0001-4000-8000-000000000006",
       "name": "Extract Client DB IDs",
       "type": "n8n-nodes-base.code",
@@ -117,7 +86,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\nconst blocks = $input.first().json?.results || [];\n\nconst childDatabases = blocks.filter(b => b.type === 'child_database');\n\nlet callAgendasDbId = null;\nlet masterContentDbId = null;\n\nfor (const db of childDatabases) {\n  const title = (db.child_database?.title || '').toLowerCase();\n  if (title.includes('call agenda') || title.includes('call log')) {\n    callAgendasDbId = db.id;\n  }\n  if (title.includes('master content') || title.includes('content database')) {\n    masterContentDbId = db.id;\n  }\n}\n\nif (!callAgendasDbId) {\n  throw new Error(`Could not find 'Call Agendas' database in ${dashboardInfo.client_name}'s dashboard. Ensure it is a top-level database on the dashboard page (not inside a toggle).`);\n}\nif (!masterContentDbId) {\n  throw new Error(`Could not find 'Master Content Database' in ${dashboardInfo.client_name}'s dashboard. Ensure it is a top-level database on the dashboard page.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasDbId,\n    master_content_db_id: masterContentDbId\n  }\n}];"
+        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\n\nconst callAgendasSearch = $('Search Call Agendas DB').first().json;\nconst masterContentSearch = $('Search Master Content DB').first().json;\n\nconst callAgendasResults = (callAgendasSearch.results || []).filter(r => r.object === 'database');\nconst masterContentResults = (masterContentSearch.results || []).filter(r => r.object === 'database');\n\nif (!callAgendasResults.length) {\n  throw new Error(`Could not find 'Call Agendas' database for ${dashboardInfo.client_name}. Check the database exists and the Notion integration has access.`);\n}\nif (!masterContentResults.length) {\n  throw new Error(`Could not find 'Master Content Database' for ${dashboardInfo.client_name}. Check the database exists and the Notion integration has access.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasResults[0].id,\n    master_content_db_id: masterContentResults[0].id\n  }\n}];"
       }
     },
     {
@@ -1332,6 +1301,82 @@
         },
         "options": {}
       }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000056",
+      "name": "Search Call Agendas DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1220,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\":\"Call Agendas\",\"filter\":{\"value\":\"database\",\"property\":\"object\"},\"page_size\":10}"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000057",
+      "name": "Search Master Content DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1220,
+        480
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\":\"Master Content\",\"filter\":{\"value\":\"database\",\"property\":\"object\"},\"page_size\":10}"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion API"
+        }
+      }
     }
   ],
   "connections": {
@@ -1372,18 +1417,12 @@
       "main": [
         [
           {
-            "node": "List Dashboard Child Blocks",
+            "node": "Search Call Agendas DB",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "List Dashboard Child Blocks": {
-      "main": [
-        [
+          },
           {
-            "node": "Extract Client DB IDs",
+            "node": "Search Master Content DB",
             "type": "main",
             "index": 0
           }
@@ -1966,6 +2005,28 @@
             "node": "Pre-process Inputs",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Call Agendas DB": {
+      "main": [
+        [
+          {
+            "node": "Extract Client DB IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Master Content DB": {
+      "main": [
+        [
+          {
+            "node": "Extract Client DB IDs",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
