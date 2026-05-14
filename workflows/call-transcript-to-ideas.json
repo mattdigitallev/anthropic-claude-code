@@ -312,7 +312,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ include: { participants: true } }) }}"
+        "jsonBody": "={{ JSON.stringify({ include: { participants: true }, limit: 500 }) }}"
       },
       "credentials": {
         "httpHeaderAuth": {
