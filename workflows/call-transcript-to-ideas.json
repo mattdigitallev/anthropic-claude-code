@@ -104,11 +104,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2340,
+        3260,
         300
       ],
       "parameters": {
-        "jsCode": "const preprocess   = $('Pre-process Inputs').first().json   || {};\nconst dashboardInfo = $('Extract Dashboard Info').first().json || {};\nconst navBlocks = $input.first().json?.results || [];\n\nlet callAgendasId = null;\nlet masterContentId = null;\nlet intelBriefPageId = null;\nlet strategyDocPageId = null;\nlet formatBankId = null;\n\nfor (const block of navBlocks) {\n  if (block.type === 'child_database') {\n    const title = (block.child_database?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n    if (title.includes('format bank')) formatBankId = block.id;\n  }\n  if (block.type === 'child_page') {\n    const title = (block.child_page?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n    if (title.includes('intelligence brief')) intelBriefPageId = block.id;\n    if (title.includes('content strategy')) strategyDocPageId = block.id;\n    if (title.includes('format bank')) formatBankId = block.id;\n  }\n}\n\nconst blockSummary = navBlocks.map(b =>\n  `${b.type}: \"${b.child_database?.title || b.child_page?.title || '(no title)'}\" [${b.id}]`\n).join(' | ');\n\nconst clientName = preprocess.client_name || dashboardInfo.client_name || '';\nconsole.log(`Extract Client DB IDs for \"${clientName}\"`);\nconsole.log(`Blocks found: ${blockSummary}`);\nconsole.log(`call_agendas_db_id: ${callAgendasId}, master_content_db_id: ${masterContentId}, intel_brief_page_id: ${intelBriefPageId}, strategy_doc_page_id: ${strategyDocPageId}`);\n\nif (!callAgendasId) {\n  throw new Error(`Could not find 'Call Agendas' database for ${clientName}. Blocks: ${blockSummary}`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' for ${clientName}. Blocks: ${blockSummary}`);\n}\nif (!intelBriefPageId) {\n  throw new Error(`Could not find 'Intelligence Brief' child_page for ${clientName} in the navigation callout. Blocks: ${blockSummary}`);\n}\nif (!strategyDocPageId) {\n  throw new Error(`Could not find 'Content Strategy' child_page for ${clientName} in the navigation callout. Blocks: ${blockSummary}`);\n}\n\nreturn [{\n  json: {\n    ...preprocess,\n    ...dashboardInfo,\n    client_name: clientName,\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId,\n    intel_brief_page_id: intelBriefPageId,\n    strategy_doc_page_id: strategyDocPageId,\n    format_bank_db_id: formatBankId\n  }\n}];\n"
+        "jsCode": "const preprocess    = $('Pre-process Inputs').first().json   || {};\nconst dashboardInfo = $('Extract Dashboard Info').first().json || {};\n\n// Navigation callout sits in Column 0 of the dashboard and holds the client's databases\n// (Call Agendas, Master Content Database, Performance Reports) plus a \"Resources\" child_page.\nconst navBlocks = $('Fetch Navigation Callout Content').first().json?.results || [];\n\n// General Pages callout lives INSIDE the Resources child_page and holds the per-client docs\n// (Intelligence Brief, Content Strategy Doc, Brand Config, Onboarding Forms, Competitor Tracking).\nconst generalBlocks = $('Fetch General Pages Callout Content').first().json?.results || [];\n\nlet callAgendasId = null;\nlet masterContentId = null;\nlet performanceReportsId = null;\nlet intelBriefPageId = null;\nlet strategyDocPageId = null;\nlet brandConfigPageId = null;\nlet competitorTrackingPageId = null;\nlet formatBankId = null;\n\nfunction blockTitle(b) {\n  if (b.type === 'child_database') return (b.child_database?.title || '').toLowerCase();\n  if (b.type === 'child_page') return (b.child_page?.title || '').toLowerCase();\n  return '';\n}\n\nfor (const b of navBlocks) {\n  const title = blockTitle(b);\n  if (b.type === 'child_database') {\n    if (title.includes('call agenda')) callAgendasId = b.id;\n    if (title.includes('master content')) masterContentId = b.id;\n    if (title.includes('performance report')) performanceReportsId = b.id;\n    if (title.includes('format bank')) formatBankId = b.id;\n  }\n}\n\nfor (const b of generalBlocks) {\n  const title = blockTitle(b);\n  if (b.type === 'child_page') {\n    if (title.includes('intelligence brief')) intelBriefPageId = b.id;\n    if (title.includes('content strategy')) strategyDocPageId = b.id;\n    if (title.includes('brand config')) brandConfigPageId = b.id;\n    if (title.includes('competitor tracking')) competitorTrackingPageId = b.id;\n  }\n}\n\nconst summarize = (arr) => arr.map(b =>\n  `${b.type}: \"${b.child_database?.title || b.child_page?.title || '(no title)'}\" [${b.id}]`\n).join(' | ');\n\nconst clientName = preprocess.client_name || dashboardInfo.client_name || '';\nconsole.log(`Extract Client DB IDs for \"${clientName}\"`);\nconsole.log(`Nav callout blocks: ${summarize(navBlocks)}`);\nconsole.log(`General Pages blocks: ${summarize(generalBlocks)}`);\n\nif (!callAgendasId) {\n  throw new Error(`Could not find 'Call Agendas' database for ${clientName}. Nav callout: ${summarize(navBlocks)}`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' for ${clientName}. Nav callout: ${summarize(navBlocks)}`);\n}\nif (!intelBriefPageId) {\n  throw new Error(`Could not find 'Intelligence Brief' page for ${clientName} inside Resources → General Pages. General Pages: ${summarize(generalBlocks)}`);\n}\nif (!strategyDocPageId) {\n  throw new Error(`Could not find 'Content Strategy' page for ${clientName} inside Resources → General Pages. General Pages: ${summarize(generalBlocks)}`);\n}\n\nreturn [{\n  json: {\n    ...preprocess,\n    ...dashboardInfo,\n    client_name: clientName,\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId,\n    performance_reports_db_id: performanceReportsId,\n    format_bank_db_id: formatBankId,\n    intel_brief_page_id: intelBriefPageId,\n    strategy_doc_page_id: strategyDocPageId,\n    brand_config_page_id: brandConfigPageId,\n    competitor_tracking_page_id: competitorTrackingPageId\n  }\n}];\n"
       }
     },
     {
@@ -1231,6 +1231,68 @@
       }
     },
     {
+      "id": "a1b2c3d4-0001-4000-8000-000000000059",
+      "name": "Fetch Column 0 Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.results[0].id + '/children?page_size=100' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000062",
+      "name": "Fetch Navigation Callout Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2060,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.results.find(r => r.type === 'callout' && r.callout?.icon?.type !== 'emoji').id + '/children?page_size=100' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      }
+    },
+    {
       "id": "a1b2c3d4-0001-4000-8000-000000000060",
       "name": "Get Call Agendas Schema",
       "type": "n8n-nodes-base.httpRequest",
@@ -1700,25 +1762,25 @@
       }
     },
     {
-      "id": "dash-fanout-0001-4000-8000-000000000001",
-      "name": "Split Columns",
+      "id": "resources-drill-0001-4000-8000-000000000001",
+      "name": "Find Resources Page",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1700,
+        2300,
         300
       ],
       "parameters": {
-        "jsCode": "const cols = $input.first().json?.results || [];\nconst columnItems = cols\n  .filter(c => c.type === 'column')\n  .map(c => ({ json: { id: c.id } }));\n\nif (columnItems.length === 0) {\n  throw new Error('No column blocks found in dashboard column_list. Raw blocks: ' +\n    JSON.stringify(cols.map(c => ({ type: c.type, id: c.id })).slice(0, 20)));\n}\n\nconsole.log(`Fan-out over ${columnItems.length} column(s).`);\nreturn columnItems;\n"
+        "jsCode": "const blocks = $input.first().json?.results || [];\nconst resources = blocks.find(b => b.type === 'child_page' && (b.child_page?.title || '').toLowerCase().includes('resources'));\nif (!resources) {\n  throw new Error('Could not find a \"Resources\" child_page inside the navigation callout. Blocks: ' +\n    blocks.map(b => `${b.type}: \"${b.child_database?.title || b.child_page?.title || '(no title)'}\" [${b.id}]`).join(' | '));\n}\nreturn [{ json: { id: resources.id, found: true } }];\n"
       }
     },
     {
-      "id": "dash-fanout-0001-4000-8000-000000000002",
-      "name": "Fetch Each Column Content",
+      "id": "resources-drill-0001-4000-8000-000000000002",
+      "name": "Fetch Resources Children",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        1780,
+        2540,
         300
       ],
       "parameters": {
@@ -1744,25 +1806,25 @@
       }
     },
     {
-      "id": "dash-fanout-0001-4000-8000-000000000003",
-      "name": "Collect Callout IDs",
+      "id": "resources-drill-0001-4000-8000-000000000003",
+      "name": "Find General Pages Callout",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1860.0,
+        2780,
         300
       ],
       "parameters": {
-        "jsCode": "const colItems = $input.all();\nconst callouts = [];\nconst directLeaves = [];\n\nfor (const item of colItems) {\n  const blocks = item.json?.results || [];\n  for (const b of blocks) {\n    if (b.type === 'callout') {\n      callouts.push(b.id);\n    } else if (b.type === 'child_database' || b.type === 'child_page') {\n      directLeaves.push(b);\n    }\n  }\n}\n\nconsole.log(`Found ${callouts.length} callout(s) across columns; ${directLeaves.length} direct leaf block(s).`);\n\n// Stash direct leaves on the workflow via a static buffer through the first item.\n// They'll be picked up by Aggregate Dashboard Leaves via $('Collect Callout IDs').all().\nif (callouts.length === 0 && directLeaves.length === 0) {\n  throw new Error('No callouts or leaf blocks found in any column. Check dashboard structure.');\n}\n\nconst items = callouts.map(id => ({ json: { id, _direct_leaves: directLeaves } }));\n// If there are no callouts but we have direct leaves, still emit a synthetic item so the chain continues.\nif (items.length === 0) {\n  return [{ json: { id: null, _direct_leaves: directLeaves, _skip_fetch: true } }];\n}\nreturn items;\n"
+        "jsCode": "const blocks = $input.first().json?.results || [];\n// Inside the Resources page, find the callout that holds the General Pages list.\n// We don't filter on icon type — we just take the first callout. If you ever add more\n// callouts to Resources, tighten this match.\nconst callout = blocks.find(b => b.type === 'callout');\nif (!callout) {\n  throw new Error('Could not find a callout inside the Resources page. Blocks: ' +\n    blocks.map(b => `${b.type} [${b.id}]`).join(' | '));\n}\nreturn [{ json: { id: callout.id, found: true } }];\n"
       }
     },
     {
-      "id": "dash-fanout-0001-4000-8000-000000000004",
-      "name": "Fetch Each Callout Content",
+      "id": "resources-drill-0001-4000-8000-000000000004",
+      "name": "Fetch General Pages Callout Content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        2060,
+        3020,
         300
       ],
       "parameters": {
@@ -1785,19 +1847,6 @@
           "id": "oyQgOUsxQsxmUvK8",
           "name": "Notion (via API)"
         }
-      }
-    },
-    {
-      "id": "dash-fanout-0001-4000-8000-000000000005",
-      "name": "Aggregate Dashboard Leaves",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2260,
-        300
-      ],
-      "parameters": {
-        "jsCode": "// Read children fetched from each callout (current input) and direct leaves stashed on Collect Callout IDs items.\nconst calloutChildrenItems = $input.all();\nconst calloutDispatchItems = $('Collect Callout IDs').all();\n\nconst leaves = [];\n\nfor (const item of calloutChildrenItems) {\n  const blocks = item.json?.results || [];\n  for (const b of blocks) {\n    if (b.type === 'child_database' || b.type === 'child_page') {\n      leaves.push(b);\n    }\n  }\n}\n\n// Direct leaves (child_database / child_page found at column-level, not inside any callout)\nfor (const item of calloutDispatchItems) {\n  const direct = item.json?._direct_leaves || [];\n  for (const b of direct) {\n    if (b.type === 'child_database' || b.type === 'child_page') {\n      leaves.push(b);\n    }\n  }\n}\n\n// Dedupe by id (a leaf could theoretically appear twice if the structure has overlap)\nconst seen = new Set();\nconst deduped = leaves.filter(b => {\n  if (seen.has(b.id)) return false;\n  seen.add(b.id);\n  return true;\n});\n\nconsole.log(`Aggregated ${deduped.length} leaf block(s) for downstream resolution.`);\nreturn [{ json: { results: deduped } }];\n"
       }
     }
   ],
@@ -2336,7 +2385,34 @@
       "main": [
         [
           {
-            "node": "Split Columns",
+            "node": "Fetch Column 0 Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Column 1 Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Column 0 Content": {
+      "main": [
+        [
+          {
+            "node": "Fetch Navigation Callout Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Navigation Callout Content": {
+      "main": [
+        [
+          {
+            "node": "Find Resources Page",
             "type": "main",
             "index": 0
           }
@@ -2573,51 +2649,40 @@
         ]
       ]
     },
-    "Split Columns": {
+    "Find Resources Page": {
       "main": [
         [
           {
-            "node": "Fetch Each Column Content",
+            "node": "Fetch Resources Children",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Each Column Content": {
+    "Fetch Resources Children": {
       "main": [
         [
           {
-            "node": "Collect Callout IDs",
+            "node": "Find General Pages Callout",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Collect Callout IDs": {
+    "Find General Pages Callout": {
       "main": [
         [
           {
-            "node": "Fetch Each Callout Content",
+            "node": "Fetch General Pages Callout Content",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Each Callout Content": {
-      "main": [
-        [
-          {
-            "node": "Aggregate Dashboard Leaves",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Aggregate Dashboard Leaves": {
+    "Fetch General Pages Callout Content": {
       "main": [
         [
           {
