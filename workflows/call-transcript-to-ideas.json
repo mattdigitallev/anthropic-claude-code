@@ -343,25 +343,6 @@
               "value": "100"
             }
           ]
-        },
-        "options": {
-          "pagination": {
-            "pagination": {
-              "parameters": {
-                "parameters": [
-                  {
-                    "type": "qs",
-                    "name": "cursor",
-                    "value": "={{ $response.body?.cursor || $response.body?.next_cursor || $response.body?.pagination?.next_cursor || '' }}"
-                  }
-                ]
-              },
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body?.cursor && !$response.body?.next_cursor && !$response.body?.pagination?.next_cursor }}",
-              "limitPagesFetched": true,
-              "maxRequests": 25
-            }
-          }
         }
       },
       "credentials": {
