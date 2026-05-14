@@ -1499,37 +1499,6 @@
       }
     },
     {
-      "id": "a1b2c3d4-0001-4000-8000-000000000063",
-      "name": "IF Has Existing Transcript",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        3460,
-        580
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "has-url",
-              "leftValue": "={{ (($json.results || []).length > 0 && !!($json.results[0]?.properties?.['Transcript URL']?.url)) ? 'true' : 'false' }}",
-              "rightValue": "true",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      }
-    },
-    {
       "id": "a1b2c3d4-0001-4000-8000-000000000060",
       "name": "Get Call Agendas Schema",
       "type": "n8n-nodes-base.httpRequest",
