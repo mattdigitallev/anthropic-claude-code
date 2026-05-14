@@ -294,7 +294,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "https://api.grain.com/_/public-api/v2/recordings",
+        "url": "https://api.grain.com/_/public-api/v2/recordings?limit=500",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -312,7 +312,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ include: { participants: true }, limit: 500 }) }}"
+        "jsonBody": "={{ JSON.stringify({ include: { participants: true } }) }}"
       },
       "credentials": {
         "httpHeaderAuth": {
