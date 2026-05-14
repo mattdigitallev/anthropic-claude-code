@@ -108,7 +108,7 @@
         300
       ],
       "parameters": {
-        "jsCode": "const preprocess    = $('Pre-process Inputs').first().json   || {};\nconst dashboardInfo = $('Extract Dashboard Info').first().json || {};\n\n// Navigation callout sits in Column 0 of the dashboard and holds the client's databases\n// (Call Agendas, Master Content Database, Performance Reports) plus a \"Resources\" child_page.\nconst navBlocks = $('Fetch Navigation Callout Content').first().json?.results || [];\n\n// General Pages callout lives INSIDE the Resources child_page and holds the per-client docs\n// (Intelligence Brief, Content Strategy Doc, Brand Config, Onboarding Forms, Competitor Tracking).\nconst generalBlocks = $('Fetch General Pages Callout Content').first().json?.results || [];\n\nlet callAgendasId = null;\nlet masterContentId = null;\nlet performanceReportsId = null;\nlet intelBriefPageId = null;\nlet strategyDocPageId = null;\nlet brandConfigPageId = null;\nlet competitorTrackingPageId = null;\nlet formatBankId = null;\n\nfunction blockTitle(b) {\n  if (b.type === 'child_database') return (b.child_database?.title || '').toLowerCase();\n  if (b.type === 'child_page') return (b.child_page?.title || '').toLowerCase();\n  return '';\n}\n\nfor (const b of navBlocks) {\n  const title = blockTitle(b);\n  if (b.type === 'child_database') {\n    if (title.includes('call agenda')) callAgendasId = b.id;\n    if (title.includes('master content')) masterContentId = b.id;\n    if (title.includes('performance report')) performanceReportsId = b.id;\n    if (title.includes('format bank')) formatBankId = b.id;\n  }\n}\n\nfor (const b of generalBlocks) {\n  const title = blockTitle(b);\n  if (b.type === 'child_page') {\n    if (title.includes('intelligence brief')) intelBriefPageId = b.id;\n    if (title.includes('content strategy')) strategyDocPageId = b.id;\n    if (title.includes('brand config')) brandConfigPageId = b.id;\n    if (title.includes('competitor tracking')) competitorTrackingPageId = b.id;\n  }\n}\n\nconst summarize = (arr) => arr.map(b =>\n  `${b.type}: \"${b.child_database?.title || b.child_page?.title || '(no title)'}\" [${b.id}]`\n).join(' | ');\n\nconst clientName = preprocess.client_name || dashboardInfo.client_name || '';\nconsole.log(`Extract Client DB IDs for \"${clientName}\"`);\nconsole.log(`Nav callout blocks: ${summarize(navBlocks)}`);\nconsole.log(`General Pages blocks: ${summarize(generalBlocks)}`);\n\nif (!callAgendasId) {\n  throw new Error(`Could not find 'Call Agendas' database for ${clientName}. Nav callout: ${summarize(navBlocks)}`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' for ${clientName}. Nav callout: ${summarize(navBlocks)}`);\n}\nif (!intelBriefPageId) {\n  throw new Error(`Could not find 'Intelligence Brief' page for ${clientName} inside Resources → General Pages. General Pages: ${summarize(generalBlocks)}`);\n}\nif (!strategyDocPageId) {\n  throw new Error(`Could not find 'Content Strategy' page for ${clientName} inside Resources → General Pages. General Pages: ${summarize(generalBlocks)}`);\n}\n\nreturn [{\n  json: {\n    ...preprocess,\n    ...dashboardInfo,\n    client_name: clientName,\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId,\n    performance_reports_db_id: performanceReportsId,\n    format_bank_db_id: formatBankId,\n    intel_brief_page_id: intelBriefPageId,\n    strategy_doc_page_id: strategyDocPageId,\n    brand_config_page_id: brandConfigPageId,\n    competitor_tracking_page_id: competitorTrackingPageId\n  }\n}];\n"
+        "jsCode": "// Pre-process Inputs is the first Code node — always accessible as a named ref.\n// Extract Dashboard Info is often unreachable here because several HTTP nodes\n// sit between them and n8n loses the named-ref context. So we pull client fields\n// directly from Pre-process Inputs, and only use Extract Dashboard Info for\n// dashboard_page_id / primary_email which are set there.\nconst preprocess   = $('Pre-process Inputs').first().json   || {};\nconst dashboardInfo = $('Extract Dashboard Info').first().json || {};\nconst navBlocks = $input.first().json?.results || [];\n\nlet callAgendasId = null;\nlet masterContentId = null;\n\nfor (const block of navBlocks) {\n  if (block.type === 'child_database') {\n    const title = (block.child_database?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n  if (block.type === 'child_page') {\n    const title = (block.child_page?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n}\n\nconst blockSummary = navBlocks.map(b =>\n  `${b.type}: \"${b.child_database?.title || b.child_page?.title || '(no title)'}\" [${b.id}]`\n).join(' | ');\n\nconst clientName = preprocess.client_name || dashboardInfo.client_name || '';\nconsole.log(`Extract Client DB IDs for \"${clientName}\"`);\nconsole.log(`Blocks found: ${blockSummary}`);\nconsole.log(`call_agendas_db_id: ${callAgendasId}, master_content_db_id: ${masterContentId}`);\n\nif (!callAgendasId) {\n  throw new Error(`Could not find 'Call Agendas' database for ${clientName}. Blocks: ${blockSummary}`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' for ${clientName}. Blocks: ${blockSummary}`);\n}\n\nreturn [{\n  json: {\n    ...preprocess,\n    ...dashboardInfo,\n    client_name: clientName,   // ensure it's never dropped\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId\n  }\n}];"
       }
     },
     {
@@ -1762,30 +1762,17 @@
       }
     },
     {
-      "id": "resources-drill-0001-4000-8000-000000000001",
-      "name": "Find Resources Page",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2300,
-        300
-      ],
-      "parameters": {
-        "jsCode": "const blocks = $input.first().json?.results || [];\nconst resources = blocks.find(b => b.type === 'child_page' && (b.child_page?.title || '').toLowerCase().includes('resources'));\nif (!resources) {\n  throw new Error('Could not find a \"Resources\" child_page inside the navigation callout. Blocks: ' +\n    blocks.map(b => `${b.type}: \"${b.child_database?.title || b.child_page?.title || '(no title)'}\" [${b.id}]`).join(' | '));\n}\nreturn [{ json: { id: resources.id, found: true } }];\n"
-      }
-    },
-    {
-      "id": "resources-drill-0001-4000-8000-000000000002",
-      "name": "Fetch Resources Children",
+      "id": "a1b2c3d4-0001-4000-8000-000000000007",
+      "name": "Find Intelligence Brief Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        2540,
-        300
+        1780,
+        260
       ],
       "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.id + '/children?page_size=100' }}",
+        "method": "POST",
+        "url": "https://api.notion.com/v1/search",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -1793,9 +1780,16 @@
             {
               "name": "Notion-Version",
               "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: \"Intelligence Brief - \" + $(\"Pre-process Inputs\").first().json.client_name.replace(/\\s*\\(.*?\\)\\s*/g, \"\").trim(), filter: { value: \"page\", property: \"object\" } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -1806,30 +1800,17 @@
       }
     },
     {
-      "id": "resources-drill-0001-4000-8000-000000000003",
-      "name": "Find General Pages Callout",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2780,
-        300
-      ],
-      "parameters": {
-        "jsCode": "const blocks = $input.first().json?.results || [];\n// Inside the Resources page, find the callout that holds the General Pages list.\n// We don't filter on icon type — we just take the first callout. If you ever add more\n// callouts to Resources, tighten this match.\nconst callout = blocks.find(b => b.type === 'callout');\nif (!callout) {\n  throw new Error('Could not find a callout inside the Resources page. Blocks: ' +\n    blocks.map(b => `${b.type} [${b.id}]`).join(' | '));\n}\nreturn [{ json: { id: callout.id, found: true } }];\n"
-      }
-    },
-    {
-      "id": "resources-drill-0001-4000-8000-000000000004",
-      "name": "Fetch General Pages Callout Content",
+      "id": "a1b2c3d4-0001-4000-8000-000000000008",
+      "name": "Find Content Strategy Doc Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        3020,
-        300
+        1780,
+        540
       ],
       "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.id + '/children?page_size=100' }}",
+        "method": "POST",
+        "url": "https://api.notion.com/v1/search",
         "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
@@ -1837,9 +1818,16 @@
             {
               "name": "Notion-Version",
               "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: \"Content Strategy Doc - \" + $(\"Pre-process Inputs\").first().json.client_name.replace(/\\s*\\(.*?\\)\\s*/g, \"\").trim(), filter: { value: \"page\", property: \"object\" } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -1847,6 +1835,19 @@
           "id": "oyQgOUsxQsxmUvK8",
           "name": "Notion (via API)"
         }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000009",
+      "name": "Resolve Page IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// Extract Client DB IDs is a direct ancestor (via Find Intelligence Brief Page and\n// Find Content Strategy Doc Page), so this named reference is reliable.\nconst dashboardInfo = $('Extract Client DB IDs').first().json;\n\n// Collect all search results from both inputs\nconst allResults = $input.all().flatMap(item => item.json?.results || []);\n\nconst intelPage = allResults.find(p => {\n  const title = (p.properties?.title?.title?.[0]?.plain_text || p.properties?.Name?.title?.[0]?.plain_text || '').toLowerCase();\n  return title.includes('intelligence brief');\n});\n\nconst strategyPage = allResults.find(p => {\n  const title = (p.properties?.title?.title?.[0]?.plain_text || p.properties?.Name?.title?.[0]?.plain_text || '').toLowerCase();\n  return title.includes('content strategy');\n});\n\nif (!intelPage) throw new Error('Intelligence Brief page not found for: ' + dashboardInfo.client_name);\nif (!strategyPage) throw new Error('Content Strategy Doc page not found for: ' + dashboardInfo.client_name);\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    intel_brief_page_id: intelPage.id,\n    strategy_doc_page_id: strategyPage.id\n  }\n}];"
       }
     }
   ],
@@ -1888,12 +1889,12 @@
       "main": [
         [
           {
-            "node": "Fetch Intelligence Brief",
+            "node": "Find Intelligence Brief Page",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Fetch Content Strategy Doc",
+            "node": "Find Content Strategy Doc Page",
             "type": "main",
             "index": 0
           }
@@ -2412,7 +2413,7 @@
       "main": [
         [
           {
-            "node": "Find Resources Page",
+            "node": "Extract Client DB IDs",
             "type": "main",
             "index": 0
           }
@@ -2649,44 +2650,38 @@
         ]
       ]
     },
-    "Find Resources Page": {
+    "Find Intelligence Brief Page": {
       "main": [
         [
           {
-            "node": "Fetch Resources Children",
+            "node": "Resolve Page IDs",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Resources Children": {
+    "Find Content Strategy Doc Page": {
       "main": [
         [
           {
-            "node": "Find General Pages Callout",
+            "node": "Resolve Page IDs",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Find General Pages Callout": {
+    "Resolve Page IDs": {
       "main": [
         [
           {
-            "node": "Fetch General Pages Callout Content",
+            "node": "Fetch Intelligence Brief",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch General Pages Callout Content": {
-      "main": [
-        [
+          },
           {
-            "node": "Extract Client DB IDs",
+            "node": "Fetch Content Strategy Doc",
             "type": "main",
             "index": 0
           }
