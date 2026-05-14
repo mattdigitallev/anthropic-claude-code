@@ -340,9 +340,28 @@
           "parameters": [
             {
               "name": "per_page",
-              "value": "200"
+              "value": "100"
             }
           ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "cursor",
+                    "value": "={{ $response.body?.cursor || $response.body?.next_cursor || $response.body?.pagination?.next_cursor || '' }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body?.cursor && !$response.body?.next_cursor && !$response.body?.pagination?.next_cursor }}",
+              "limitPagesFetched": true,
+              "maxRequests": 25
+            }
+          }
         }
       },
       "credentials": {
@@ -1665,6 +1684,16 @@
         "url": "https://slack.com/api/chat.postMessage",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ channel: 'C0B1Y5EGZPA', text: $json.slack_message }) }}"
       },
@@ -1785,6 +1814,19 @@
           "id": "oyQgOUsxQsxmUvK8",
           "name": "Notion (via API)"
         }
+      }
+    },
+    {
+      "id": "b1c2d3e4-0001-4000-8000-000000000201",
+      "name": "Flatten Grain Pages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3320,
+        180
+      ],
+      "parameters": {
+        "jsCode": "const pages = $input.all();\nconst allRecordings = [];\nfor (const item of pages) {\n  const recs = item.json?.recordings || [];\n  for (const r of recs) {\n    if (r?.id) allRecordings.push(r);\n  }\n}\nconsole.log('Flattened ' + pages.length + ' Grain page(s) into ' + allRecordings.length + ' recordings.');\nreturn [{ json: { recordings: allRecordings, page_count: pages.length } }];"
       }
     }
   ],
@@ -1936,7 +1978,7 @@
       "main": [
         [
           {
-            "node": "Merge Grain and Agendas",
+            "node": "Flatten Grain Pages",
             "type": "main",
             "index": 0
           }
@@ -2580,6 +2622,17 @@
         [
           {
             "node": "Mark Submission Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Grain Pages": {
+      "main": [
+        [
+          {
+            "node": "Merge Grain and Agendas",
             "type": "main",
             "index": 0
           }
