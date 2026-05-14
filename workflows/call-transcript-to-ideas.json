@@ -22,7 +22,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\n\n// Throw immediately if there is no client_name so the empty orchestrator\n// test-trigger path dies here and cannot pollute named refs downstream.\nif (!input.client_name) {\n  throw new Error('Stopping: no client_name in input (empty test trigger or orchestrator bug).');\n}\n\nconst clientName = input.client_name || '';\nconst batchDate = input.batch_date || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest = input.fetch_latest_call_transcript === true || input.fetch_latest_call_transcript === 'true';\nconst notesRaw = (input.notes_for_ai || '').trim();\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name: clientName,\n    batch_date: batchDate,\n    fetch_latest_transcript: fetchLatest,\n    notes_for_ai: notesRaw,\n    specific_call_ref: specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign: callSign\n  }\n}];"
+        "jsCode": "const input = $input.first().json;\n\nconst clientName = input.client_name || '';\nconst batchDate = input.batch_date || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest = input.fetch_latest_call_transcript === true || input.fetch_latest_call_transcript === 'true';\nconst notesRaw = (input.notes_for_ai || '').trim();\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name: clientName,\n    batch_date: batchDate,\n    fetch_latest_transcript: fetchLatest,\n    notes_for_ai: notesRaw,\n    specific_call_ref: specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign: callSign\n  }\n}];"
       }
     },
     {
@@ -1669,6 +1669,19 @@
       "parameters": {
         "jsCode": "const clientName = $json.client_name || '(unknown client)';\nconst reason = $json.abort_reason || '(no reason provided)';\nconst message = ':warning: *Call Transcript to Ideas failed for ' + clientName + '*\\n\\n*Reason:* ' + reason + '\\n\\nNo transcript was saved and no batch was created. Fix the issue above and re-run.';\nreturn [{ json: { slack_message: message } }];"
       }
+    },
+    {
+      "id": "guard-require-client-name-0001",
+      "name": "Guard: Require client_name",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// Return [] to silently stop execution when called with no data.\n// This happens when n8n's test button fires Receive from Orchestrator\n// with empty input alongside the Manual Test Trigger. Zero items out\n// means downstream nodes don't run \u2014 no error, no noise.\nconst input = $input.first().json;\nif (!input.client_name) return [];\nreturn [{ json: input }];"
+      }
     }
   ],
   "connections": {
@@ -1676,7 +1689,7 @@
       "main": [
         [
           {
-            "node": "Pre-process Inputs",
+            "node": "Guard: Require client_name",
             "type": "main",
             "index": 0
           }
@@ -2441,6 +2454,17 @@
         [
           {
             "node": "Send Client Match Error to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard: Require client_name": {
+      "main": [
+        [
+          {
+            "node": "Pre-process Inputs",
             "type": "main",
             "index": 0
           }
