@@ -1669,19 +1669,6 @@
       "parameters": {
         "jsCode": "const clientName = $json.client_name || '(unknown client)';\nconst reason = $json.abort_reason || '(no reason provided)';\nconst message = ':warning: *Call Transcript to Ideas failed for ' + clientName + '*\\n\\n*Reason:* ' + reason + '\\n\\nNo transcript was saved and no batch was created. Fix the issue above and re-run.';\nreturn [{ json: { slack_message: message } }];"
       }
-    },
-    {
-      "id": "guard-require-client-name-0001",
-      "name": "Guard: Require client_name",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        240,
-        400
-      ],
-      "parameters": {
-        "jsCode": "// Return [] to silently stop execution when called with no data.\n// This happens when n8n's test button fires Receive from Orchestrator\n// with empty input alongside the Manual Test Trigger. Zero items out\n// means downstream nodes don't run \u2014 no error, no noise.\nconst input = $input.first().json;\nif (!input.client_name) return [];\nreturn [{ json: input }];"
-      }
     }
   ],
   "connections": {
@@ -1689,7 +1676,7 @@
       "main": [
         [
           {
-            "node": "Guard: Require client_name",
+            "node": "Pre-process Inputs",
             "type": "main",
             "index": 0
           }
@@ -2293,17 +2280,6 @@
         ]
       ]
     },
-    "Set Test Defaults (Bobby Freiler)": {
-      "main": [
-        [
-          {
-            "node": "Guard: Require client_name",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Fetch Dashboard Blocks": {
       "main": [
         [
@@ -2454,17 +2430,6 @@
         [
           {
             "node": "Send Client Match Error to Slack",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Guard: Require client_name": {
-      "main": [
-        [
-          {
-            "node": "Pre-process Inputs",
             "type": "main",
             "index": 0
           }
