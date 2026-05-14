@@ -276,36 +276,6 @@
       }
     },
     {
-      "id": "a1b2c3d4-0001-4000-8000-000000000013",
-      "name": "IF Fetch Latest Transcript",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        2900,
-        400
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ String($json.fetch_latest_transcript) }}",
-              "rightValue": "true",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      }
-    },
-    {
       "id": "a1b2c3d4-0001-4000-8000-000000000014",
       "name": "Query Grain All Calls",
       "type": "n8n-nodes-base.httpRequest",
@@ -600,44 +570,6 @@
       ],
       "parameters": {
         "jsCode": "const prepData = $('Prepare Transcript for Doc').first().json;\nconst agendaRow = $('Create Call Agendas Row').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\n// client_name insurance: prepData should have it from Cross-check Dates spread,\n// but if any node in the chain dropped it, fall back to Pre-process Inputs directly.\nconst clientName = prepData.client_name || preprocess.client_name || '';\n\nreturn [{\n  json: {\n    ...prepData,\n    client_name: clientName,\n    agenda_row_id: agendaRow.id,\n    transcript_doc_url: prepData.doc_url,\n    call_title: 'Call ' + prepData.new_call_number + ' - ' + clientName + ' x Digital Leverage',\n    source: 'fresh_fetch'\n  }\n}];"
-      }
-    },
-    {
-      "id": "a1b2c3d4-0001-4000-8000-000000000024",
-      "name": "Get Latest Call Agendas Row",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        3180,
-        580
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Extract Client DB IDs').first().json.call_agendas_db_id + '/query' }}",
-        "authentication": "predefinedCredentialType",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ ({ sorts: [{ property: 'Call Date', direction: 'descending' }], page_size: 1 }) }}",
-        "nodeCredentialType": "notionApi"
-      },
-      "credentials": {
-        "notionApi": {
-          "id": "oyQgOUsxQsxmUvK8",
-          "name": "Notion (via API)"
-        }
       }
     },
     {
