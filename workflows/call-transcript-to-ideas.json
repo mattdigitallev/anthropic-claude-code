@@ -75,7 +75,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ filter: { property: 'Name', title: { equals: $json.client_name } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ filter: { property: 'Name', title: { equals: $('Pre-process Inputs').first().json.client_name } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -334,7 +334,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ include: { participants: true } }) }}",
+        "jsonBody": "={{ { include: { participants: true } } }}",
         "sendQuery": true,
         "queryParameters": {
           "parameters": []
@@ -1726,7 +1726,7 @@
         "operation": "update",
         "pageId": {
           "__rl": true,
-          "value": "={{ $json.id }}",
+          "value": "={{ $('Pre-process Inputs').first().json.submission_page_id }}",
           "mode": "id"
         },
         "propertiesUi": {
@@ -1830,7 +1830,7 @@
       "main": [
         [
           {
-            "node": "Find Client Dashboard",
+            "node": "Mark Submission Processing",
             "type": "main",
             "index": 0
           }
@@ -2583,7 +2583,7 @@
       "main": [
         [
           {
-            "node": "Mark Submission Processing",
+            "node": "Pre-process Inputs",
             "type": "main",
             "index": 0
           }
@@ -2594,7 +2594,7 @@
       "main": [
         [
           {
-            "node": "Pre-process Inputs",
+            "node": "Find Client Dashboard",
             "type": "main",
             "index": 0
           }
