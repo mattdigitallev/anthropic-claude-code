@@ -15,7 +15,9 @@
         "databaseId": {
           "__rl": true,
           "value": "5aa66f2123b445c38324cf3354b2ee85",
-          "mode": "id"
+          "mode": "list",
+          "cachedResultName": "Ideation Launcher",
+          "cachedResultUrl": "https://www.notion.so/5aa66f2123b445c38324cf3354b2ee85"
         },
         "pollTimes": {
           "item": [
