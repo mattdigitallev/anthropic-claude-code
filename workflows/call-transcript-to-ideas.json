@@ -44,7 +44,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst submissionPageId = input.id || '';\n\n// Accept both orchestrator-mapped field names (client_name, batch_date, ...)\n// and raw Notion Ideation Launcher field names (Client, Week Of, ...).\nconst clientName = input.client_name || input['Client'] || '';\nconst batchDate  = input.batch_date  || input['Week Of'] || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest =\n  input.fetch_latest_call_transcript === true  ||\n  input.fetch_latest_call_transcript === 'true' ||\n  input['Fetch Latest Call Transcript?'] === true;\nconst notesRaw = (input.notes_for_ai || input['Notes for AI'] || '').trim();\nconst callNumberOverride = input.call_number_override || null;\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch    = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign   = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name:              clientName,\n    batch_date:               batchDate,\n    fetch_latest_transcript:  fetchLatest,\n    notes_for_ai:             notesRaw,\n    call_number_override:     callNumberOverride,\n    specific_call_ref:        specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign:                callSign,\n    submission_page_id:       submissionPageId\n  }\n}];"
+        "jsCode": "const input = $input.first().json;\nconst submissionPageId = input.id || '';\n\n// Accept both orchestrator-mapped field names (client_name, batch_date, ...)\n// and raw Notion Ideation Launcher field names (Client, Week Of, ...).\nconst clientName = input.client_name || input['Client'] || '';\nconst batchDate  = input.batch_date  || input['Week Of'] || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest =\n  input.fetch_latest_call_transcript === true  ||\n  input.fetch_latest_call_transcript === 'true' ||\n  input['Fetch Latest Call Transcript?'] === true;\nconst notesRaw = (input.notes_for_ai || input['Notes for AI'] || '').trim();\nconst callNumberOverride = input.call_number_override || null;\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch    = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\n// Detect Grain recording URL pasted into Notes for AI (overrides call selection)\nconst grainUrlPattern = /https?:\\/\\/(?:grain\\.com|app\\.grain\\.com)\\/(?:share\\/recording|recordings?)\\/([a-zA-Z0-9_-]+)/i;\nconst grainUrlMatch = notesRaw.match(grainUrlPattern);\nif (grainUrlMatch && !specificCallRef) {\n  specificCallRef = { type: 'grain_url', grain_recording_id: grainUrlMatch[1], original_url: grainUrlMatch[0] };\n  fetchLatest = true; // must route through Grain API to fetch that recording\n}\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign   = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name:              clientName,\n    batch_date:               batchDate,\n    fetch_latest_transcript:  fetchLatest,\n    notes_for_ai:             notesRaw,\n    call_number_override:     callNumberOverride,\n    specific_call_ref:        specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign:                callSign,\n    submission_page_id:       submissionPageId\n  }\n}];"
       }
     },
     {
@@ -427,7 +427,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\nconst primaryEmail   = (contextData.primary_email   || '').toLowerCase().trim();\nconst secondaryEmail = (contextData.secondary_email || '').toLowerCase().trim();\n\nconst allRecordings = (grainRaw?.recordings || []).filter(c => !!c?.id);\nconst notionRows = notionRaw?.results || [];\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\nconst callNumber = callNumberOverride > 0 ? callNumberOverride : notionRows.length + 1;\n\nif (!clientName) {\n  return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty.' } }];\n}\n\n// If Grain Recording ID is set on the client page, use it directly — skip all search.\nconst grainRecordingId = contextData.grain_recording_id || preprocess.grain_recording_id || '';\nif (grainRecordingId) {\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: grainRecordingId,\n      latest_grain_call_title: 'Recording ' + grainRecordingId,\n      latest_grain_call_date: new Date().toISOString(),\n      new_call_number: callNumber\n    }\n  }];\n}\n\nif (!primaryEmail && !secondaryEmail) {\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No Primary Email or Secondary Email set on ' + clientName + \"'s Notion page. Add the client's email so the workflow can identify their Grain calls.\"\n  } }];\n}\n\nif (allRecordings.length === 0) {\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'Grain returned 0 recordings.'\n  } }];\n}\n\n// A recording is \"this client's call\" if their email is in the participants list.\n// We check primary_email and (optionally) secondary_email.\nconst targetEmails = [primaryEmail, secondaryEmail].filter(Boolean);\n\nfunction recordingHasClient(r) {\n  const parts = r.participants || r.participant_list || [];\n  return parts.some(p => {\n    const email = (p?.email || '').toLowerCase().trim();\n    return email && targetEmails.includes(email);\n  });\n}\n\nconst matches = allRecordings.filter(recordingHasClient);\n\nif (matches.length === 0) {\n  // Build a diagnostic: emails seen across the recordings Grain returned.\n  const seen = new Set();\n  for (const r of allRecordings) {\n    for (const p of (r.participants || [])) {\n      if (p?.email) seen.add(p.email.toLowerCase());\n    }\n  }\n  const sampleEmails = [...seen].slice(0, 30).join('\\n  - ');\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No Grain recording in the last ' + allRecordings.length + ' had ' + clientName + ' as a participant. '\n      + 'Looked for: ' + targetEmails.join(', ') + '. '\n      + 'If the email is correct but their call is older than what Grain returned, paste the Grain Recording ID '\n      + '(from the recording URL) into \"Grain Recording ID\" on the client Notion page.\\n\\nParticipant emails seen across recent recordings:\\n  - ' + sampleEmails\n  } }];\n}\n\nconst sorted = [...matches].sort((a, b) =>\n  new Date(a.start_datetime || a.started_at || 0) - new Date(b.start_datetime || b.started_at || 0)\n);\nconst latestCall = sorted[sorted.length - 1];\nconsole.log('Client participant filter matched ' + matches.length + ' of ' + allRecordings.length + '. Selected: \"' + (latestCall.title || latestCall.id) + '\" (' + (latestCall.start_datetime || latestCall.started_at) + ')');\n\nreturn [{\n  json: {\n    ...contextData, abort: false,\n    client_name: clientName, call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    latest_grain_call_id: latestCall.id,\n    latest_grain_call_title: latestCall.title || '',\n    latest_grain_call_date: latestCall.start_datetime || latestCall.started_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
+        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\nconst primaryEmail   = (contextData.primary_email   || '').toLowerCase().trim();\nconst secondaryEmail = (contextData.secondary_email || '').toLowerCase().trim();\n\nconst allRecordings = (grainRaw?.recordings || []).filter(c => !!c?.id);\nconst notionRows = notionRaw?.results || [];\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\nconst callNumber = callNumberOverride > 0 ? callNumberOverride : notionRows.length + 1;\n\nif (!clientName) {\n  return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty.' } }];\n}\n\n// Recording ID override — from client's Notion page OR a Grain URL pasted in Notes for AI\nconst grainRecordingId = contextData.grain_recording_id || preprocess.grain_recording_id || '';\nconst notesGrainId = preprocess.specific_call_ref?.type === 'grain_url'\n  ? preprocess.specific_call_ref.grain_recording_id : null;\nconst overrideRecordingId = notesGrainId || grainRecordingId;\n\nif (overrideRecordingId) {\n  // Try to find the recording in the fetched list (gets title, date, etc.)\n  const specificRec = allRecordings.find(r => r.id === overrideRecordingId);\n  if (specificRec) {\n    return [{\n      json: {\n        ...contextData, abort: false,\n        client_name: clientName, call_sign: callSign,\n        batch_date: preprocess.batch_date || contextData.batch_date || '',\n        latest_grain_call_id: specificRec.id,\n        latest_grain_call_title: specificRec.title || 'Recording ' + specificRec.id,\n        latest_grain_call_date: specificRec.start_datetime || specificRec.started_at || new Date().toISOString(),\n        new_call_number: callNumber\n      }\n    }];\n  }\n  // Recording is older than the fetched window — use ID directly\n  console.log('Override recording ' + overrideRecordingId + ' not in fetched window; using ID directly.');\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: overrideRecordingId,\n      latest_grain_call_title: 'Recording ' + overrideRecordingId,\n      latest_grain_call_date: new Date().toISOString(),\n      new_call_number: callNumber\n    }\n  }];\n}\n\nif (!primaryEmail && !secondaryEmail) {\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No Primary Email or Secondary Email set on ' + clientName + \"'s Notion page. Add the client's email so the workflow can identify their Grain calls.\"\n  } }];\n}\n\nif (allRecordings.length === 0) {\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'Grain returned 0 recordings.'\n  } }];\n}\n\n// A recording is \"this client's call\" if their email is in the participants list.\n// We check primary_email and (optionally) secondary_email.\nconst targetEmails = [primaryEmail, secondaryEmail].filter(Boolean);\n\nfunction recordingHasClient(r) {\n  const parts = r.participants || r.participant_list || [];\n  return parts.some(p => {\n    const email = (p?.email || '').toLowerCase().trim();\n    return email && targetEmails.includes(email);\n  });\n}\n\nconst matches = allRecordings.filter(recordingHasClient);\n\nif (matches.length === 0) {\n  // Build a diagnostic: emails seen across the recordings Grain returned.\n  const seen = new Set();\n  for (const r of allRecordings) {\n    for (const p of (r.participants || [])) {\n      if (p?.email) seen.add(p.email.toLowerCase());\n    }\n  }\n  const sampleEmails = [...seen].slice(0, 30).join('\\n  - ');\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No Grain recording in the last ' + allRecordings.length + ' had ' + clientName + ' as a participant. '\n      + 'Looked for: ' + targetEmails.join(', ') + '. '\n      + 'If the email is correct but their call is older than what Grain returned, paste the Grain Recording ID '\n      + '(from the recording URL) into \"Grain Recording ID\" on the client Notion page.\\n\\nParticipant emails seen across recent recordings:\\n  - ' + sampleEmails\n  } }];\n}\n\nconst sorted = [...matches].sort((a, b) =>\n  new Date(a.start_datetime || a.started_at || 0) - new Date(b.start_datetime || b.started_at || 0)\n);\nconst latestCall = sorted[sorted.length - 1];\nconsole.log('Client participant filter matched ' + matches.length + ' of ' + allRecordings.length + '. Selected: \"' + (latestCall.title || latestCall.id) + '\" (' + (latestCall.start_datetime || latestCall.started_at) + ')');\n\nreturn [{\n  json: {\n    ...contextData, abort: false,\n    client_name: clientName, call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    latest_grain_call_id: latestCall.id,\n    latest_grain_call_title: latestCall.title || '',\n    latest_grain_call_date: latestCall.start_datetime || latestCall.started_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
       }
     },
     {
@@ -971,7 +971,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "const ctx = $('Parse Ideas and Extract Format Names').first().json;\nconst formatExamples = $('Query Format Bank Pass 2 Examples').first().json;\n\nconst examplesMap = {};\n(formatExamples.results || []).forEach(page => {\n  const p = page.properties || {};\n  const name = p['Format Name']?.title?.[0]?.plain_text || '';\n  if (name) {\n    examplesMap[name] = {\n      name,\n      description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n      when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n      platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter',\n      example_1: p['Example 1']?.rich_text?.[0]?.plain_text || '',\n      example_2: p['Example 2']?.rich_text?.[0]?.plain_text || '',\n      example_3: p['Example 3']?.rich_text?.[0]?.plain_text || ''\n    };\n  }\n});\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\nBATCH: ${ctx.total_posts_per_batch} posts - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}\\nWRITER'S NOTES: ${ctx.notes_for_ai || 'None'}\\n\\nFORMAT EXAMPLES:\\n${JSON.stringify(examplesMap, null, 2)}\\n\\nIDEAS TO FINALIZE:\\n${JSON.stringify(ctx.raw_ideas, null, 2)}\\n\\nFor each idea: review examples, confirm or upgrade the format, assign final platform, run quality checklist. Remove ideas that fail and cannot be fixed.\\n\\nReturn ONLY valid JSON array. Each element:\\n{\\n  \"idea\": \"1-sentence summary\",\\n  \"topic\": \"plus or minus 5 words\",\\n  \"one_of_one_opinion\": \"unique take\",\\n  \"content_pillar\": \"exact pillar name\",\\n  \"format\": \"exact format name from Format Bank\",\\n  \"platform\": \"LinkedIn or X/Twitter\",\\n  \"sources\": \"direct quotes from transcript plus explanation of why this works\",\\n  \"notes_for_reviewer\": \"AI flags for human reviewer, empty string if none\",\\n  \"passes_checklist\": true or false,\\n  \"checklist_issues\": \"describe issues if false, empty string if true\"\\n}`;\n\nreturn [{ json: { ...ctx, examples_map: examplesMap, finalize_user_prompt: userPrompt } }];"
+        "jsCode": "const ctx = $('Parse Ideas and Extract Format Names').first().json;\nconst formatExamples = $('Query Format Bank Pass 2 Examples').first().json;\n\nconst examplesMap = {};\n(formatExamples.results || []).forEach(page => {\n  const p = page.properties || {};\n  const name = p['Format Name']?.title?.[0]?.plain_text || '';\n  if (name) {\n    examplesMap[name] = {\n      name,\n      description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n      when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n      platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter',\n      example_1: p['Example 1']?.rich_text?.[0]?.plain_text || '',\n      example_2: p['Example 2']?.rich_text?.[0]?.plain_text || '',\n      example_3: p['Example 3']?.rich_text?.[0]?.plain_text || ''\n    };\n  }\n});\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\nBATCH: ${ctx.total_posts_per_batch} posts - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}\\nWRITER'S NOTES: ${ctx.notes_for_ai || 'None'}\\n\\nFORMAT EXAMPLES:\\n${JSON.stringify(examplesMap, null, 2)}\\n\\nIDEAS TO FINALIZE:\\n${JSON.stringify(ctx.raw_ideas, null, 2)}\\n\\nFor each idea: review examples, confirm or upgrade the format, assign final platform, run quality checklist. Remove ideas that fail and cannot be fixed.\\n\\nReturn ONLY valid JSON array. Each element:\\n{\\n  \"idea\": \"client-facing row title — combine format descriptor + topic + unique angle as a content pitch note. NEVER start with the client's name (e.g. never 'Bobby said...' or 'I...' — write it like a briefing note). Examples: 'Contrarian belief post about how founders over-analyse angry customers', 'Expanded listicle on the eight UIs that changed how I think about design and why', 'Short-form take on why playing it safe with content is the fastest way to become forgettable'.\",\\n  \"topic\": \"plus or minus 5 words\",\\n  \"one_of_one_opinion\": \"unique take\",\\n  \"content_pillar\": \"exact pillar name\",\\n  \"format\": \"exact format name from Format Bank\",\\n  \"platform\": \"LinkedIn or X/Twitter\",\\n  \"sources\": \"direct quotes from transcript plus explanation of why this works\",\\n  \"notes_for_reviewer\": \"AI flags for human reviewer, empty string if none\",\\n  \"passes_checklist\": true or false,\\n  \"checklist_issues\": \"describe issues if false, empty string if true\"\\n}`;\n\nreturn [{ json: { ...ctx, examples_map: examplesMap, finalize_user_prompt: userPrompt } }];"
       }
     },
     {
@@ -1003,7 +1003,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 10000, system: 'You are an expert content strategist finalizing a set of content ideas. You confirm the best format using the examples provided, assign platform, and run the full quality checklist on every idea.\\n\\nQUALITY CHECKLIST - every idea must pass ALL 5:\\n1. Has a clear topic\\n2. Has a format assigned\\n3. Has a genuine 1-of-1 opinion (only this client could say this)\\n4. Passes the 365-day test\\n5. Is truly 1-of-1\\n\\nANTI-HALLUCINATION CHECKS:\\n- Every idea must trace back to a real transcript moment\\n- No merged insights\\n- No made-up conclusions\\n- Sources column must contain real evidence\\n\\nFORMAT SELECTION:\\n- Review the examples carefully. Confirm or upgrade based on what the examples show\\n- Formats are building blocks - note if two can be combined\\n- Ensure variety across the batch: mix of lengths and format types\\n\\nPLATFORM ASSIGNMENT:\\n- Use format Platform field as primary guide\\n- For LinkedIn and X/Twitter formats, assign based on cadence split\\n\\nRemove ideas that fail the checklist and cannot be fixed.\\n\\nReturn ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.finalize_user_prompt }] }) }}"
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 10000, system: 'You are an expert content strategist finalizing a set of content ideas. You confirm the best format using the examples provided, assign platform, and run the full quality checklist on every idea.\\n\\nQUALITY CHECKLIST - every idea must pass ALL 5:\\n1. Has a clear topic\\n2. Has a format assigned\\n3. Has a genuine 1-of-1 opinion (only this client could say this)\\n4. Passes the 365-day test\\n5. Is truly 1-of-1\\n\\nANTI-HALLUCINATION CHECKS:\\n- Every idea must trace back to a real transcript moment\\n- No merged insights\\n- No made-up conclusions\\n- Sources column must contain real evidence\\n\\nFORMAT SELECTION:\\n- Review the examples carefully. Confirm or upgrade based on what the examples show\\n- Formats are building blocks - note if two can be combined\\n- Ensure variety across the batch: mix of lengths and format types\\n\\nPLATFORM ASSIGNMENT:\\n- Use format Platform field as primary guide\\n- For LinkedIn and X/Twitter formats, assign based on cadence split\\n\\nRemove ideas that fail the checklist and cannot be fixed.\\n\\nIDEA TITLE FORMAT:\\nThe \\\"idea\\\" field is the client-facing row title. Write it as a content pitch note that combines the format type, topic, and unique angle. Rules:\\n- Never start with the client name (no \\\"Bobby said...\\\" or first-person pronouns)\\n- It should read like a briefing note: clear, specific, intriguing\\n- Include the format descriptor when relevant (e.g. \\\"Contrarian belief post...\\\", \\\"Expanded listicle...\\\", \\\"Short-form take on...\\\")\\n\\nReturn ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.finalize_user_prompt }] }) }}"
       },
       "credentials": {
         "httpHeaderAuth": {
@@ -1120,8 +1120,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        11020,
-        400
+        11580,
+        760
       ],
       "parameters": {
         "method": "POST",
@@ -1823,6 +1823,106 @@
       "parameters": {
         "jsCode": "const pages = $input.all();\nconst allRecordings = [];\nfor (const item of pages) {\n  const recs = item.json?.recordings || [];\n  for (const r of recs) {\n    if (r?.id) allRecordings.push(r);\n  }\n}\nconsole.log('Flattened ' + pages.length + ' Grain page(s) into ' + allRecordings.length + ' recordings.');\nreturn [{ json: { recordings: allRecordings, page_count: pages.length } }];"
       }
+    },
+    {
+      "id": "template-fix-0001-4000-8000-000000000001",
+      "name": "Fetch Batch Page Children",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        10740,
+        640
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $('Create Batch Page').first().json.id + '/children?page_size=50' }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      }
+    },
+    {
+      "id": "template-fix-0001-4000-8000-000000000002",
+      "name": "Find Post Lineup DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11020,
+        640
+      ],
+      "parameters": {
+        "jsCode": "const batchPageId = $('Create Batch Page').first().json.id;\nconst blocks = $input.first().json?.results || [];\n\n// Find a child_database whose title contains \"post lineup\" (template creates this automatically)\nconst postLineupDb = blocks.find(b =>\n  b.type === 'child_database' &&\n  (b.child_database?.title || '').toLowerCase().includes('post lineup')\n);\n\nreturn [{\n  json: {\n    id: postLineupDb ? postLineupDb.id : null,\n    found: !!postLineupDb,\n    batch_page_id: batchPageId\n  }\n}];"
+      }
+    },
+    {
+      "id": "template-fix-0001-4000-8000-000000000003",
+      "name": "IF Post Lineup DB Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        11300,
+        640
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.found }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "template-fix-0001-4000-8000-000000000004",
+      "name": "Use Template Post Lineup DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11580,
+        480
+      ],
+      "parameters": {
+        "jsCode": "// Template DB already exists — pass its ID through with the same shape as the create-new path\nreturn [{ json: { id: $json.id, source: 'template' } }];"
+      }
+    },
+    {
+      "id": "template-fix-0001-4000-8000-000000000005",
+      "name": "Post Lineup DB Ready",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        11860,
+        640
+      ],
+      "parameters": {
+        "mode": "append"
+      }
     }
   ],
   "connections": {
@@ -2321,7 +2421,7 @@
       "main": [
         [
           {
-            "node": "Create Post Lineup Overview DB",
+            "node": "Fetch Batch Page Children",
             "type": "main",
             "index": 0
           }
@@ -2332,9 +2432,9 @@
       "main": [
         [
           {
-            "node": "Prep Ideas for Loop",
+            "node": "Post Lineup DB Ready",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -2628,6 +2728,68 @@
         [
           {
             "node": "Merge Grain and Agendas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Batch Page Children": {
+      "main": [
+        [
+          {
+            "node": "Find Post Lineup DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Post Lineup DB": {
+      "main": [
+        [
+          {
+            "node": "IF Post Lineup DB Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Post Lineup DB Exists": {
+      "main": [
+        [
+          {
+            "node": "Use Template Post Lineup DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Post Lineup Overview DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Template Post Lineup DB": {
+      "main": [
+        [
+          {
+            "node": "Post Lineup DB Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Lineup DB Ready": {
+      "main": [
+        [
+          {
+            "node": "Prep Ideas for Loop",
             "type": "main",
             "index": 0
           }
