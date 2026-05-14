@@ -908,7 +908,10 @@
           "id": "4T8Kci2Im6elVzo2",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000
     },
     {
       "id": "a1b2c3d4-0001-4000-8000-000000000038",
@@ -1010,7 +1013,10 @@
           "id": "4T8Kci2Im6elVzo2",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000
     },
     {
       "id": "a1b2c3d4-0001-4000-8000-000000000042",
