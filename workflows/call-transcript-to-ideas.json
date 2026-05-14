@@ -1142,7 +1142,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $('Create Batch Page').first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Post Lineup Overview' } }], properties: { Idea: { title: {} }, 'Review Status': { select: { options: [{ name: 'For Review', color: 'yellow' }, { name: 'Approved', color: 'green' }, { name: 'In Progress', color: 'blue' }, { name: 'Scheduled', color: 'purple' }, { name: 'Published', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, Format: { rich_text: {} }, 'Content Pillar': { rich_text: {} }, Topic: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $(\"Create Batch Page\").first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Post Lineup Overview' } }], properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'purple' }, { name: 'Needs Improvement', color: 'yellow' }, { name: 'Scratch', color: 'red' }, { name: 'Approved', color: 'green' }, { name: 'Scheduled', color: 'blue' }, { name: 'Posted', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, 'Content Pillar': { rich_text: {} }, Topic: { rich_text: {} }, Format: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -1207,7 +1207,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.post_lineup_db_id }, properties: { Idea: { title: [{ text: { content: ($json.idea || '').substring(0, 2000) } }] }, 'Review Status': { select: { name: 'For Review' } }, Platform: { select: { name: $json.platform || 'LinkedIn' } }, Format: { rich_text: [{ text: { content: ($json.format || '').substring(0, 2000) } }] }, 'Content Pillar': { rich_text: [{ text: { content: ($json.content_pillar || '').substring(0, 2000) } }] }, Topic: { rich_text: [{ text: { content: ($json.topic || '').substring(0, 2000) } }] }, Sources: { rich_text: [{ text: { content: ($json.sources || '').substring(0, 2000) } }] }, Notes: { rich_text: [{ text: { content: ($json.notes_for_reviewer || '').substring(0, 2000) } }] } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $json.post_lineup_db_id }, properties: { Idea: { title: [{ text: { content: ($json.idea || '').substring(0, 2000) } }] }, Status: { select: { name: 'For Review' } }, Platform: { select: { name: $json.platform || 'LinkedIn' } }, 'Content Pillar': { rich_text: [{ text: { content: ($json.content_pillar || '').substring(0, 2000) } }] }, Topic: { rich_text: [{ text: { content: ($json.topic || '').substring(0, 2000) } }] }, Format: { rich_text: [{ text: { content: ($json.format || '').substring(0, 2000) } }] }, Sources: { rich_text: [{ text: { content: ($json.sources || '').substring(0, 2000) } }] }, Notes: { rich_text: [{ text: { content: ($json.notes_for_reviewer || '').substring(0, 2000) } }] } } }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
