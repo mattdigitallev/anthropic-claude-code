@@ -1258,55 +1258,6 @@
       }
     },
     {
-      "id": "a1b2c3d4-0001-4000-8000-000000000054",
-      "name": "Manual Test Trigger",
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
-      "position": [
-        100,
-        200
-      ],
-      "parameters": {}
-    },
-    {
-      "id": "a1b2c3d4-0001-4000-8000-000000000055",
-      "name": "Set Test Defaults (Bobby Freiler)",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        380,
-        200
-      ],
-      "parameters": {
-        "mode": "manual",
-        "fields": {
-          "values": [
-            {
-              "name": "client_name",
-              "type": "stringValue",
-              "value": "Bobby Freiler (Trial)"
-            },
-            {
-              "name": "batch_date",
-              "type": "stringValue",
-              "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}"
-            },
-            {
-              "name": "fetch_latest_call_transcript",
-              "type": "booleanValue",
-              "value": true
-            },
-            {
-              "name": "notes_for_ai",
-              "type": "stringValue",
-              "value": ""
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "a1b2c3d4-0001-4000-8000-000000000005",
       "name": "Fetch Dashboard Blocks",
       "type": "n8n-nodes-base.httpRequest",
@@ -2452,17 +2403,6 @@
         [
           {
             "node": "Return Success",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Manual Test Trigger": {
-      "main": [
-        [
-          {
-            "node": "Set Test Defaults (Bobby Freiler)",
             "type": "main",
             "index": 0
           }
