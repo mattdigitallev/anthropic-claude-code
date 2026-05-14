@@ -86,7 +86,7 @@
         300
       ],
       "parameters": {
-        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\n\n// Databases live inside the Navigation callout (4 levels deep)\nconst navBlocks = $input.first().json?.results || [];\n\nlet callAgendasId = null;\nlet masterContentId = null;\n\nfor (const block of navBlocks) {\n  if (block.type === 'child_database') {\n    const title = (block.child_database?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n  if (block.type === 'child_page') {\n    const title = (block.child_page?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n}\n\nif (!callAgendasId) {\n  const found = navBlocks.map(b => `${b.type}: ${b.child_database?.title || b.child_page?.title || '(no title)'}`).join(', ');\n  throw new Error(`Could not find 'Call Agendas' database in Navigation callout for ${dashboardInfo.client_name}. Found: ${found}`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' in Navigation callout for ${dashboardInfo.client_name}.`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId\n  }\n}];"
+        "jsCode": "const dashboardInfo = $('Extract Dashboard Info').first().json;\nconst navBlocks = $input.first().json?.results || [];\n\nlet callAgendasId = null;\nlet masterContentId = null;\n\nfor (const block of navBlocks) {\n  if (block.type === 'child_database') {\n    const title = (block.child_database?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n  if (block.type === 'child_page') {\n    const title = (block.child_page?.title || '').toLowerCase();\n    if (title.includes('call agenda')) callAgendasId = block.id;\n    if (title.includes('master content')) masterContentId = block.id;\n  }\n}\n\n// Diagnostic: log all blocks found so you can verify the right DBs are detected\nconst blockSummary = navBlocks.map(b =>\n  `${b.type}: \"${b.child_database?.title || b.child_page?.title || '(no title)'}\" [${b.id}]`\n).join(' | ');\nconsole.log(`Extract Client DB IDs for \"${dashboardInfo.client_name}\"`);\nconsole.log(`Blocks found: ${blockSummary}`);\nconsole.log(`call_agendas_db_id: ${callAgendasId}, master_content_db_id: ${masterContentId}`);\n\nif (!callAgendasId) {\n  throw new Error(`Could not find 'Call Agendas' database in Navigation callout for ${dashboardInfo.client_name}. Blocks: ${blockSummary}`);\n}\nif (!masterContentId) {\n  throw new Error(`Could not find 'Master Content Database' in Navigation callout for ${dashboardInfo.client_name}. Blocks: ${blockSummary}`);\n}\n\nreturn [{\n  json: {\n    ...dashboardInfo,\n    call_agendas_db_id: callAgendasId,\n    master_content_db_id: masterContentId\n  }\n}];"
       }
     },
     {
@@ -1518,7 +1518,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "// Dynamically discover column names from the actual Notion DB schema\nconst schema = $input.first().json;\nconst prepData = $('Prepare Transcript for Doc').first().json;\nconst dbId = $('Extract Client DB IDs').first().json.call_agendas_db_id;\n\nconst schemaProps = schema.properties || {};\n\n// Find the title property (the main column - its type is always 'title')\nconst titlePropName = Object.entries(schemaProps).find(([, v]) => v.type === 'title')?.[0] || 'Name';\n// Find a url-type property\nconst urlPropName = Object.entries(schemaProps).find(([, v]) => v.type === 'url')?.[0];\n// Find a date-type property\nconst datePropName = Object.entries(schemaProps).find(([k, v]) => v.type === 'date')?.[0];\n\nconst callNum = prepData.new_call_number || '?';\nconst clientName = prepData.client_name || '?';\nconst callDate = (prepData.latest_grain_call_date || new Date().toISOString()).split('T')[0];\nconst docUrl = prepData.doc_url;\n\n// Diagnostics logged so they appear in n8n execution log\nconsole.log(`Schema title column: \"${titlePropName}\", url column: \"${urlPropName || 'none'}\", date column: \"${datePropName || 'none'}\"`);\nconsole.log(`prepData.doc_url: ${docUrl}`);\n\nconst properties = {};\nproperties[titlePropName] = { title: [{ type: 'text', text: { content: 'Call ' + callNum + ' - ' + clientName + ' x Digital Leverage' } }] };\nif (datePropName) {\n  properties[datePropName] = { date: { start: callDate } };\n}\nif (urlPropName && docUrl) {\n  properties[urlPropName] = { url: docUrl };\n} else if (!docUrl) {\n  console.log('WARNING: doc_url missing from Prepare Transcript for Doc output - Transcript URL will not be set');\n}\n\nreturn [{ json: { row_body: { parent: { database_id: dbId }, properties } } }];"
+        "jsCode": "// Schema now comes from Get Call Agendas Schema (named ref, 3 nodes up)\nconst schema = $('Get Call Agendas Schema').first().json;\n// Input is Parse Summary and Topics output (has prepData fields + summary + topics)\nconst summaryData = $input.first().json;\nconst prepData = $('Prepare Transcript for Doc').first().json;\nconst dbId = $('Extract Client DB IDs').first().json.call_agendas_db_id;\n\nconst schemaProps = schema.properties || {};\n\n// Dynamically discover column types\nconst titlePropName = Object.entries(schemaProps).find(([, v]) => v.type === 'title')?.[0] || 'Name';\nconst datePropName = Object.entries(schemaProps).find(([, v]) => v.type === 'date')?.[0];\n// Specifically find Transcript URL (url type containing 'transcript')\nconst transcriptUrlPropName = Object.entries(schemaProps).find(([k, v]) => v.type === 'url' && k.toLowerCase().includes('transcript'))?.[0]\n  || Object.entries(schemaProps).find(([, v]) => v.type === 'url')?.[0];\n// Specifically find Recording URL (url type containing 'recording')\nconst recordingUrlPropName = Object.entries(schemaProps).find(([k, v]) => v.type === 'url' && k.toLowerCase().includes('recording'))?.[0];\n// Summary and Topics (rich_text type)\nconst summaryPropName = Object.entries(schemaProps).find(([k, v]) => v.type === 'rich_text' && k.toLowerCase().includes('summary'))?.[0];\nconst topicsPropName = Object.entries(schemaProps).find(([k, v]) => v.type === 'rich_text' && k.toLowerCase().includes('topic'))?.[0];\n\n// Robust client_name fallback chain \u2014 pre-process inputs is always the earliest reliable source\nconst clientName = prepData.client_name\n  || summaryData.client_name\n  || $('Pre-process Inputs').first().json?.client_name\n  || '?';\n\nconst callNum = prepData.new_call_number || summaryData.new_call_number || '?';\nconst callDate = (prepData.latest_grain_call_date || summaryData.latest_grain_call_date || new Date().toISOString()).split('T')[0];\nconst docUrl = prepData.doc_url || summaryData.doc_url;\nconst grainCallId = prepData.latest_grain_call_id || summaryData.latest_grain_call_id || '';\nconst recordingUrl = grainCallId ? `https://grain.com/share/recording/${grainCallId}` : null;\nconst callSummary = summaryData.call_summary || '';\nconst callTopics = summaryData.call_topics || '';\n\nconsole.log(`Building row for \"${clientName}\", call ${callNum}, date ${callDate}`);\nconsole.log(`Schema \u2014 title: \"${titlePropName}\", transcript url: \"${transcriptUrlPropName}\", recording url: \"${recordingUrlPropName}\", summary: \"${summaryPropName}\", topics: \"${topicsPropName}\"`);\nconsole.log(`doc_url: ${docUrl}, recording_url: ${recordingUrl}`);\n\nconst properties = {};\nproperties[titlePropName] = { title: [{ type: 'text', text: { content: 'Call ' + callNum + ' - ' + clientName + ' x Digital Leverage' } }] };\nif (datePropName) properties[datePropName] = { date: { start: callDate } };\nif (transcriptUrlPropName && docUrl) properties[transcriptUrlPropName] = { url: docUrl };\nif (recordingUrlPropName && recordingUrl) properties[recordingUrlPropName] = { url: recordingUrl };\nif (summaryPropName && callSummary) properties[summaryPropName] = { rich_text: [{ type: 'text', text: { content: callSummary.substring(0, 2000) } }] };\nif (topicsPropName && callTopics) properties[topicsPropName] = { rich_text: [{ type: 'text', text: { content: callTopics.substring(0, 2000) } }] };\n\nreturn [{ json: { row_body: { parent: { database_id: dbId }, properties } } }];"
       }
     },
     {
@@ -1532,6 +1532,61 @@
       ],
       "parameters": {
         "jsCode": "// Debug: log what we're about to send to Notion for Create Idea Row\nconst item = $input.first().json;\nconst body = {\n  parent: { database_id: item.post_lineup_db_id },\n  properties: {\n    Idea: { title: [{ text: { content: (item.idea || '').substring(0, 200) } }] },\n    'Review Status': { select: { name: 'For Review' } },\n    Platform: { select: { name: item.platform || 'LinkedIn' } },\n    Format: { rich_text: [{ text: { content: (item.format || '').substring(0, 200) } }] },\n    'Content Pillar': { rich_text: [{ text: { content: (item.content_pillar || '').substring(0, 200) } }] },\n    Topic: { rich_text: [{ text: { content: (item.topic || '').substring(0, 200) } }] },\n    Sources: { rich_text: [{ text: { content: (item.sources || '').substring(0, 200) } }] },\n    Notes: { rich_text: [{ text: { content: (item.notes_for_reviewer || '').substring(0, 200) } }] }\n  }\n};\nconsole.log('post_lineup_db_id:', item.post_lineup_db_id);\nconsole.log('Notion body (first 500 chars):', JSON.stringify(body).substring(0, 500));\nreturn [{ json: { ...item, _debug_body: JSON.stringify(body) } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000063",
+      "name": "Generate Call Summary and Topics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4560,
+        280
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $credentials.value }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5-20251001',\n  max_tokens: 800,\n  system: 'You extract structured information from call transcripts. Return ONLY valid JSON with no markdown or extra text.',\n  messages: [{\n    role: 'user',\n    content: 'Analyze this call transcript and return a JSON object with exactly these two fields:\\n\\n{\\n  \"summary\": \"3-5 sentence summary of what was discussed on the call\",\\n  \"topics\": [\"Topic one\", \"Topic two\", \"Topic three\", \"Topic four\", \"Topic five\"]\\n}\\n\\nReturn 5-7 topics as concise bullet-style items (3-7 words each). Focus on the main themes discussed.\\n\\nTranscript:\\n' + ($('Prepare Transcript for Doc').first().json.transcript_text || 'No transcript available.').substring(0, 28000)\n  }]\n}) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4T8Kci2Im6elVzo2",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000064",
+      "name": "Parse Summary and Topics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4740,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const claudeResponse = $input.first().json;\nconst content = claudeResponse.content?.[0]?.text || '';\n\nlet summary = '';\nlet topics = '';\ntry {\n  const match = content.match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(match ? match[0] : content);\n  summary = parsed.summary || '';\n  const topicsArray = Array.isArray(parsed.topics) ? parsed.topics : [];\n  topics = topicsArray.map(t => `\u2022 ${t}`).join('\\n');\n} catch(e) {\n  console.log('Warning: Could not parse summary/topics response:', content.substring(0, 200));\n}\n\n// Carry through all prepData fields so downstream can access them\nconst prepData = $('Prepare Transcript for Doc').first().json;\n\nreturn [{\n  json: {\n    ...prepData,\n    call_summary: summary,\n    call_topics: topics\n  }\n}];"
       }
     }
   ],
@@ -2231,7 +2286,7 @@
       "main": [
         [
           {
-            "node": "Build Row Properties from Schema",
+            "node": "Generate Call Summary and Topics",
             "type": "main",
             "index": 0
           }
@@ -2254,6 +2309,28 @@
         [
           {
             "node": "Create Idea Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Call Summary and Topics": {
+      "main": [
+        [
+          {
+            "node": "Parse Summary and Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Summary and Topics": {
+      "main": [
+        [
+          {
+            "node": "Build Row Properties from Schema",
             "type": "main",
             "index": 0
           }
