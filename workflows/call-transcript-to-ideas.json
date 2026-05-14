@@ -2354,14 +2354,14 @@
       "main": [
         [
           {
-            "node": "Log Idea Row Body",
+            "node": "Build Slack Message",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Build Slack Message",
+            "node": "Log Idea Row Body",
             "type": "main",
             "index": 0
           }
