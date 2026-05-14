@@ -312,7 +312,20 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ filter: { participant_email: $json.primary_email || '' }, include: { participants: true } }) }}"
+        "jsonBody": "={{ JSON.stringify({ include: { participants: true } }) }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "participant_email",
+              "value": "={{ $json.primary_email || '' }}"
+            },
+            {
+              "name": "per_page",
+              "value": "200"
+            }
+          ]
+        }
       },
       "credentials": {
         "httpHeaderAuth": {
