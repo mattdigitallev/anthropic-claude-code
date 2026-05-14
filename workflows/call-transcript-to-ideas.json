@@ -337,12 +337,26 @@
         "jsonBody": "={{ JSON.stringify({ include: { participants: true } }) }}",
         "sendQuery": true,
         "queryParameters": {
-          "parameters": [
-            {
-              "name": "per_page",
-              "value": "100"
+          "parameters": []
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "cursor",
+                    "value": "={{ $response.body.cursor }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.cursor }}",
+              "limitPagesFetched": true,
+              "maxRequests": 25
             }
-          ]
+          }
         }
       },
       "credentials": {
