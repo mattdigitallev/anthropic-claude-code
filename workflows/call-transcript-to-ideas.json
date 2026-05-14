@@ -75,7 +75,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        174224,
+        175044,
         44688
       ]
     },
@@ -1825,25 +1825,12 @@
       }
     },
     {
-      "id": "drilldown-0001-4000-8000-000000000003",
-      "name": "Find General Pages Callout",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        173744,
-        44496
-      ],
-      "parameters": {
-        "jsCode": "const blocks = $input.first().json?.results || [];\nconst callout = blocks.find(b => b.type === 'callout');\nif (!callout) {\n  throw new Error('Could not find a callout inside the Resources page. Blocks: ' +\n    blocks.map(b => `${b.type} [${b.id}]`).join(' | '));\n}\nreturn [{ json: { id: callout.id, found: true } }];\n"
-      }
-    },
-    {
       "id": "drilldown-0001-4000-8000-000000000004",
       "name": "Fetch General Pages Callout Content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        173984,
+        174824,
         44496
       ],
       "parameters": {
@@ -1866,6 +1853,107 @@
           "id": "oyQgOUsxQsxmUvK8",
           "name": "Notion (via API)"
         }
+      }
+    },
+    {
+      "id": "nested-0001-4000-8000-000000000001",
+      "name": "Find Resources Column List or Callout",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        173724,
+        44496
+      ],
+      "parameters": {
+        "jsCode": "const blocks = $input.first().json?.results || [];\n\n// Prefer column_list (the General Pages callout lives inside its columns).\n// If a callout exists at the top level (older structure), pass it straight through with a flag.\nconst columnList = blocks.find(b => b.type === 'column_list');\nif (columnList) {\n  return [{ json: { id: columnList.id, kind: 'column_list' } }];\n}\n\nconst topCallout = blocks.find(b => b.type === 'callout');\nif (topCallout) {\n  return [{ json: { id: topCallout.id, kind: 'callout_direct' } }];\n}\n\nthrow new Error('Could not find a column_list or callout inside the Resources page. Blocks: ' +\n  blocks.map(b => `${b.type} [${b.id}]`).join(' | '));\n"
+      }
+    },
+    {
+      "id": "nested-0001-4000-8000-000000000002",
+      "name": "Fetch Resources Column List Children",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        173944,
+        44496
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.id + '/children?page_size=100' }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      }
+    },
+    {
+      "id": "nested-0001-4000-8000-000000000003",
+      "name": "Split Resources Columns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        174164,
+        44496
+      ],
+      "parameters": {
+        "jsCode": "// Input: result of fetching the Resources page's column_list children (i.e. the column blocks),\n// OR a passthrough if the Resources page had a direct callout (no column_list).\nconst ref = $('Find Resources Column List or Callout').first().json;\n\nif (ref.kind === 'callout_direct') {\n  // The \"callout\" branch — emit a single item carrying the callout ID so the next step fetches it.\n  return [{ json: { id: ref.id, _is_callout: true } }];\n}\n\nconst cols = ($input.first().json?.results || []).filter(b => b.type === 'column');\nif (cols.length === 0) {\n  throw new Error('column_list inside Resources had no column children.');\n}\nreturn cols.map(c => ({ json: { id: c.id, _is_callout: false } }));\n"
+      }
+    },
+    {
+      "id": "nested-0001-4000-8000-000000000004",
+      "name": "Fetch Each Resources Column Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        174384,
+        44496
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.id + '/children?page_size=100' }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      }
+    },
+    {
+      "id": "nested-0001-4000-8000-000000000005",
+      "name": "Find General Pages Callout in Columns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        174604,
+        44496
+      ],
+      "parameters": {
+        "jsCode": "// Aggregate every column's children and find the (first) callout — this is the General Pages callout.\n// If the upstream branch was a direct callout (no column_list), it has already been fetched\n// and we just pass through.\nconst splitItems = $('Split Resources Columns').all();\nif (splitItems.length === 1 && splitItems[0].json?._is_callout) {\n  return [{ json: { id: splitItems[0].json.id, source: 'direct' } }];\n}\n\nconst allChildren = $input.all();\nfor (const item of allChildren) {\n  const blocks = item.json?.results || [];\n  const callout = blocks.find(b => b.type === 'callout');\n  if (callout) {\n    return [{ json: { id: callout.id, source: 'column' } }];\n  }\n}\n\n// Dump diagnostics\nconst summary = allChildren.map((item, i) => {\n  const blocks = item.json?.results || [];\n  return `col${i}: [${blocks.map(b => b.type).join(', ')}]`;\n}).join(' || ');\nthrow new Error('No callout found in any column inside Resources. ' + summary);\n"
       }
     }
   ],
@@ -2673,18 +2761,7 @@
       "main": [
         [
           {
-            "node": "Find General Pages Callout",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Find General Pages Callout": {
-      "main": [
-        [
-          {
-            "node": "Fetch General Pages Callout Content",
+            "node": "Find Resources Column List or Callout",
             "type": "main",
             "index": 0
           }
@@ -2696,6 +2773,61 @@
         [
           {
             "node": "Extract Client DB IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Resources Column List or Callout": {
+      "main": [
+        [
+          {
+            "node": "Fetch Resources Column List Children",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Resources Column List Children": {
+      "main": [
+        [
+          {
+            "node": "Split Resources Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Resources Columns": {
+      "main": [
+        [
+          {
+            "node": "Fetch Each Resources Column Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Each Resources Column Content": {
+      "main": [
+        [
+          {
+            "node": "Find General Pages Callout in Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find General Pages Callout in Columns": {
+      "main": [
+        [
+          {
+            "node": "Fetch General Pages Callout Content",
             "type": "main",
             "index": 0
           }
