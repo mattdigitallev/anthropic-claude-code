@@ -22,7 +22,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\n\n// When n8n \"Test\" is clicked, Receive from Orchestrator fires with empty {}.\n// Throwing here stops that dead-end path so it doesn't pollute named refs\n// used by downstream nodes. The Manual Test Trigger path (Set Test Defaults)\n// always provides real data and continues normally.\nif (!input.client_name && Object.keys(input).length === 0) {\n  throw new Error('No orchestrator data \u2014 stopping empty test run.');\n}\n\nconst clientName = input.client_name || '';\nconst batchDate = input.batch_date || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest = input.fetch_latest_call_transcript === true || input.fetch_latest_call_transcript === 'true';\nconst notesRaw = (input.notes_for_ai || '').trim();\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name: clientName,\n    batch_date: batchDate,\n    fetch_latest_transcript: fetchLatest,\n    notes_for_ai: notesRaw,\n    specific_call_ref: specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign: callSign\n  }\n}];"
+        "jsCode": "const input = $input.first().json;\n\n// Throw immediately if there is no client_name so the empty orchestrator\n// test-trigger path dies here and cannot pollute named refs downstream.\nif (!input.client_name) {\n  throw new Error('Stopping: no client_name in input (empty test trigger or orchestrator bug).');\n}\n\nconst clientName = input.client_name || '';\nconst batchDate = input.batch_date || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest = input.fetch_latest_call_transcript === true || input.fetch_latest_call_transcript === 'true';\nconst notesRaw = (input.notes_for_ai || '').trim();\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name: clientName,\n    batch_date: batchDate,\n    fetch_latest_transcript: fetchLatest,\n    notes_for_ai: notesRaw,\n    specific_call_ref: specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign: callSign\n  }\n}];"
       }
     },
     {
@@ -1648,7 +1648,7 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ channel: 'C0B1Y5EGZPA', text: $json.slack_error_message }) }}"
+        "jsonBody": "={{ JSON.stringify({ channel: 'C0B1Y5EGZPA', text: $json.slack_message }) }}"
       },
       "credentials": {
         "httpHeaderAuth": {
@@ -1667,7 +1667,7 @@
         460
       ],
       "parameters": {
-        "jsCode": "const clientName = $json.client_name || '(unknown client)';\nconst reason = $json.abort_reason || '(no reason provided)';\nconst message = ':warning: *Call Transcript \u2192 Ideas failed for ' + clientName + '*\\n\\n*Reason:* ' + reason + '\\n\\nNo transcript was saved and no batch was created. Fix the issue above and re-run.';\nreturn [{ json: { slack_error_message: message } }];"
+        "jsCode": "const clientName = $json.client_name || '(unknown client)';\nconst reason = $json.abort_reason || '(no reason provided)';\nconst message = ':warning: *Call Transcript to Ideas failed for ' + clientName + '*\\n\\n*Reason:* ' + reason + '\\n\\nNo transcript was saved and no batch was created. Fix the issue above and re-run.';\nreturn [{ json: { slack_message: message } }];"
       }
     }
   ],
