@@ -3,14 +3,34 @@
   "nodes": [
     {
       "id": "a1b2c3d4-0001-4000-8000-000000000001",
-      "name": "Receive from Orchestrator",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "name": "Notion: New Ideation Launcher Submission",
+      "type": "n8n-nodes-base.notionTrigger",
       "typeVersion": 1,
       "position": [
         100,
         400
       ],
-      "parameters": {}
+      "parameters": {
+        "event": "page_added",
+        "databaseId": {
+          "__rl": true,
+          "value": "5aa66f2123b445c38324cf3354b2ee85",
+          "mode": "id"
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      }
     },
     {
       "id": "a1b2c3d4-0001-4000-8000-000000000002",
@@ -1672,17 +1692,6 @@
     }
   ],
   "connections": {
-    "Receive from Orchestrator": {
-      "main": [
-        [
-          {
-            "node": "Pre-process Inputs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Pre-process Inputs": {
       "main": [
         [
@@ -2430,6 +2439,17 @@
         [
           {
             "node": "Send Client Match Error to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: New Ideation Launcher Submission": {
+      "main": [
+        [
+          {
+            "node": "Pre-process Inputs",
             "type": "main",
             "index": 0
           }
