@@ -44,7 +44,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst submissionPageId = input.id || '';\n\n// Accept both orchestrator-mapped field names (client_name, batch_date, ...)\n// and raw Notion Ideation Launcher field names (Client, Week Of, ...).\nconst clientName = input.client_name || input['Client'] || '';\nconst batchDate  = input.batch_date  || input['Week Of'] || DateTime.now().toFormat('yyyy-MM-dd');\nconst fetchLatest =\n  input.fetch_latest_call_transcript === true  ||\n  input.fetch_latest_call_transcript === 'true' ||\n  input['Fetch Latest Call Transcript?'] === true;\nconst notesRaw = (input.notes_for_ai || input['Notes for AI'] || '').trim();\nconst callNumberOverride = input.call_number_override || null;\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch    = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\n// Detect Grain recording URL pasted into Notes for AI (overrides call selection)\nconst grainUrlPattern = /https?:\\/\\/(?:grain\\.com|app\\.grain\\.com)\\/(?:share\\/recording|recordings?)\\/([a-zA-Z0-9_-]+)/i;\nconst grainUrlMatch = notesRaw.match(grainUrlPattern);\nif (grainUrlMatch && !specificCallRef) {\n  specificCallRef = { type: 'grain_url', grain_recording_id: grainUrlMatch[1], original_url: grainUrlMatch[0] };\n  fetchLatest = true; // must route through Grain API to fetch that recording\n}\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign   = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name:              clientName,\n    batch_date:               batchDate,\n    fetch_latest_transcript:  fetchLatest,\n    notes_for_ai:             notesRaw,\n    call_number_override:     callNumberOverride,\n    specific_call_ref:        specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign:                callSign,\n    submission_page_id:       submissionPageId\n  }\n}];"
+        "jsCode": "const input = $input.first().json;\nconst submissionPageId = input.id || '';\n\n// Accept both orchestrator-mapped field names and raw Notion field names.\nconst clientName = input.client_name || input['Client'] || '';\nconst batchDate  = input.batch_date  || input['Week Of'] || DateTime.now().toFormat('yyyy-MM-dd');\nconst notesRaw = (input.notes_for_ai || input['Notes for AI'] || '').trim();\nconst callNumberOverride = input.call_number_override || null;\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch    = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\n// Detect Grain recording URL pasted into Notes for AI (overrides call selection)\nconst grainUrlPattern = /https?:\\/\\/(?:grain\\.com|app\\.grain\\.com)\\/(?:share\\/recording|recordings?)\\/([a-zA-Z0-9_-]+)/i;\nconst grainUrlMatch = notesRaw.match(grainUrlPattern);\nif (grainUrlMatch && !specificCallRef) {\n  specificCallRef = { type: 'grain_url', grain_recording_id: grainUrlMatch[1], original_url: grainUrlMatch[0] };\n}\n\n// Compute target week (Mon-Sun) containing batchDate, plus previous week for fallback search.\nfunction isoDate(d) { return d.toISOString().substring(0, 10); }\nconst batchDateObj = new Date(batchDate + 'T00:00:00Z');\nconst dow = batchDateObj.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat\nconst daysToMonday = dow === 0 ? -6 : (1 - dow);\nconst targetMon = new Date(batchDateObj);\ntargetMon.setUTCDate(batchDateObj.getUTCDate() + daysToMonday);\nconst targetSun = new Date(targetMon);\ntargetSun.setUTCDate(targetMon.getUTCDate() + 6);\nconst prevMon = new Date(targetMon);\nprevMon.setUTCDate(targetMon.getUTCDate() - 7);\nconst prevSun = new Date(targetMon);\nprevSun.setUTCDate(targetMon.getUTCDate() - 1);\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign  = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name:              clientName,\n    batch_date:               batchDate,\n    notes_for_ai:             notesRaw,\n    call_number_override:     callNumberOverride,\n    specific_call_ref:        specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign:                callSign,\n    submission_page_id:       submissionPageId,\n    target_week_start:        isoDate(targetMon),\n    target_week_end:          isoDate(targetSun),\n    prev_week_start:          isoDate(prevMon),\n    prev_week_end:            isoDate(prevSun)\n  }\n}];"
       }
     },
     {
@@ -394,7 +394,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ ({ page_size: 100 }) }}",
+        "jsonBody": "={{ JSON.stringify({ filter: { and: [{ property: 'Call Date', date: { on_or_after: $('Pre-process Inputs').first().json.prev_week_start } }, { property: 'Call Date', date: { on_or_before: $('Pre-process Inputs').first().json.target_week_end } } ] }, sorts: [{ property: 'Call Date', direction: 'descending' }], page_size: 10 }) }}",
         "nodeCredentialType": "notionApi"
       },
       "credentials": {
@@ -427,7 +427,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\nconst primaryEmail   = (contextData.primary_email   || '').toLowerCase().trim();\nconst secondaryEmail = (contextData.secondary_email || '').toLowerCase().trim();\n\nconst allRecordings = (grainRaw?.recordings || []).filter(c => !!c?.id);\nconst notionRows = notionRaw?.results || [];\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\nconst callNumber = callNumberOverride > 0 ? callNumberOverride : notionRows.length + 1;\n\nif (!clientName) {\n  return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty.' } }];\n}\n\n// Recording ID override — from client's Notion page OR a Grain URL pasted in Notes for AI\nconst grainRecordingId = contextData.grain_recording_id || preprocess.grain_recording_id || '';\nconst notesGrainId = preprocess.specific_call_ref?.type === 'grain_url'\n  ? preprocess.specific_call_ref.grain_recording_id : null;\nconst overrideRecordingId = notesGrainId || grainRecordingId;\n\nif (overrideRecordingId) {\n  // Try to find the recording in the fetched list (gets title, date, etc.)\n  const specificRec = allRecordings.find(r => r.id === overrideRecordingId);\n  if (specificRec) {\n    return [{\n      json: {\n        ...contextData, abort: false,\n        client_name: clientName, call_sign: callSign,\n        batch_date: preprocess.batch_date || contextData.batch_date || '',\n        latest_grain_call_id: specificRec.id,\n        latest_grain_call_title: specificRec.title || 'Recording ' + specificRec.id,\n        latest_grain_call_date: specificRec.start_datetime || specificRec.started_at || new Date().toISOString(),\n        new_call_number: callNumber\n      }\n    }];\n  }\n  // Recording is older than the fetched window — use ID directly\n  console.log('Override recording ' + overrideRecordingId + ' not in fetched window; using ID directly.');\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: overrideRecordingId,\n      latest_grain_call_title: 'Recording ' + overrideRecordingId,\n      latest_grain_call_date: new Date().toISOString(),\n      new_call_number: callNumber\n    }\n  }];\n}\n\nif (!primaryEmail && !secondaryEmail) {\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No Primary Email or Secondary Email set on ' + clientName + \"'s Notion page. Add the client's email so the workflow can identify their Grain calls.\"\n  } }];\n}\n\nif (allRecordings.length === 0) {\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'Grain returned 0 recordings.'\n  } }];\n}\n\n// A recording is \"this client's call\" if their email is in the participants list.\n// We check primary_email and (optionally) secondary_email.\nconst targetEmails = [primaryEmail, secondaryEmail].filter(Boolean);\n\nfunction recordingHasClient(r) {\n  const parts = r.participants || r.participant_list || [];\n  return parts.some(p => {\n    const email = (p?.email || '').toLowerCase().trim();\n    return email && targetEmails.includes(email);\n  });\n}\n\nconst matches = allRecordings.filter(recordingHasClient);\n\nif (matches.length === 0) {\n  // Build a diagnostic: emails seen across the recordings Grain returned.\n  const seen = new Set();\n  for (const r of allRecordings) {\n    for (const p of (r.participants || [])) {\n      if (p?.email) seen.add(p.email.toLowerCase());\n    }\n  }\n  const sampleEmails = [...seen].slice(0, 30).join('\\n  - ');\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No Grain recording in the last ' + allRecordings.length + ' had ' + clientName + ' as a participant. '\n      + 'Looked for: ' + targetEmails.join(', ') + '. '\n      + 'If the email is correct but their call is older than what Grain returned, paste the Grain Recording ID '\n      + '(from the recording URL) into \"Grain Recording ID\" on the client Notion page.\\n\\nParticipant emails seen across recent recordings:\\n  - ' + sampleEmails\n  } }];\n}\n\nconst sorted = [...matches].sort((a, b) =>\n  new Date(a.start_datetime || a.started_at || 0) - new Date(b.start_datetime || b.started_at || 0)\n);\nconst latestCall = sorted[sorted.length - 1];\nconsole.log('Client participant filter matched ' + matches.length + ' of ' + allRecordings.length + '. Selected: \"' + (latestCall.title || latestCall.id) + '\" (' + (latestCall.start_datetime || latestCall.started_at) + ')');\n\nreturn [{\n  json: {\n    ...contextData, abort: false,\n    client_name: clientName, call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    latest_grain_call_id: latestCall.id,\n    latest_grain_call_title: latestCall.title || '',\n    latest_grain_call_date: latestCall.start_datetime || latestCall.started_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
+        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\nconst primaryEmail   = (contextData.primary_email   || '').toLowerCase().trim();\nconst secondaryEmail = (contextData.secondary_email || '').toLowerCase().trim();\n\nconst allRecordings = (grainRaw?.recordings || []).filter(c => !!c?.id);\nconst notionRows = notionRaw?.results || [];\n\nconst targetWeekStart = preprocess.target_week_start;\nconst targetWeekEnd   = preprocess.target_week_end;\nconst prevWeekStart   = preprocess.prev_week_start;\nconst prevWeekEnd     = preprocess.prev_week_end;\n\n// Count existing Call Agendas rows to determine the next call number\n// (kept rough — uses the queried window's count + offset based on prior calls)\nconst allRows = notionRaw?.results || [];\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\n\nif (!clientName) {\n  return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty.' } }];\n}\n\n// ── Notes override paths (specific call from notes) ─────────────────────────\nconst notesGrainId = preprocess.specific_call_ref?.type === 'grain_url'\n  ? preprocess.specific_call_ref.grain_recording_id : null;\nconst dashboardGrainId = contextData.grain_recording_id || '';\nconst overrideRecordingId = notesGrainId || dashboardGrainId;\n\nif (overrideRecordingId) {\n  const specificRec = allRecordings.find(r => r.id === overrideRecordingId);\n  if (specificRec) {\n    return [{\n      json: {\n        ...contextData, abort: false,\n        client_name: clientName, call_sign: callSign,\n        batch_date: preprocess.batch_date || contextData.batch_date || '',\n        latest_grain_call_id: specificRec.id,\n        latest_grain_call_title: specificRec.title || 'Recording ' + specificRec.id,\n        latest_grain_call_date: specificRec.start_datetime || specificRec.started_at || new Date().toISOString(),\n        new_call_number: callNumberOverride > 0 ? callNumberOverride : allRows.length + 1,\n        use_existing_transcript: false,\n        used_prev_week: false,\n        selection_source: 'notes_override'\n      }\n    }];\n  }\n  // Override ID not in fetched window — use directly (no title/date metadata)\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: overrideRecordingId,\n      latest_grain_call_title: 'Recording ' + overrideRecordingId,\n      latest_grain_call_date: new Date().toISOString(),\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : allRows.length + 1,\n      use_existing_transcript: false,\n      used_prev_week: false,\n      selection_source: 'notes_override_id_only'\n    }\n  }];\n}\n\n// ── Step 1: Check Call Agendas for a row in target week with a transcript URL ─\nfunction rowCallDate(row) {\n  return row?.properties?.['Call Date']?.date?.start || '';\n}\nfunction rowTranscriptUrl(row) {\n  return row?.properties?.['Transcript URL']?.url || '';\n}\nfunction rowCallTitle(row) {\n  return row?.properties?.['Title']?.title?.[0]?.plain_text\n      || row?.properties?.['Name']?.title?.[0]?.plain_text\n      || 'Untitled Call';\n}\n\nconst inTargetWeek = notionRows.filter(r => {\n  const d = rowCallDate(r);\n  return d && d >= targetWeekStart && d <= targetWeekEnd;\n});\n\n// Pick the most recent in-week row that has a transcript URL\nconst existingWithTranscript = inTargetWeek\n  .filter(r => rowTranscriptUrl(r))\n  .sort((a, b) => rowCallDate(b).localeCompare(rowCallDate(a)))[0];\n\nif (existingWithTranscript) {\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      agenda_row_id: existingWithTranscript.id,\n      transcript_doc_url: rowTranscriptUrl(existingWithTranscript),\n      call_title: rowCallTitle(existingWithTranscript),\n      latest_grain_call_date: rowCallDate(existingWithTranscript),\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : allRows.length + 1,\n      use_existing_transcript: true,\n      used_prev_week: false,\n      selection_source: 'call_agendas_target_week'\n    }\n  }];\n}\n\n// ── Step 2: No usable Call Agendas row → filter Grain to target week ────────\nif (!primaryEmail && !secondaryEmail) {\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No Primary Email or Secondary Email set on ' + clientName + \"'s Notion page. Add the client's email so the workflow can identify their Grain calls.\"\n  } }];\n}\nif (allRecordings.length === 0) {\n  return [{ json: {\n    ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'Grain returned 0 recordings.'\n  } }];\n}\n\nconst targetEmails = [primaryEmail, secondaryEmail].filter(Boolean);\nfunction recordingHasClient(r) {\n  const parts = r.participants || r.participant_list || [];\n  return parts.some(p => {\n    const email = (p?.email || '').toLowerCase().trim();\n    return email && targetEmails.includes(email);\n  });\n}\nfunction recordingDateOnly(r) {\n  return (r.start_datetime || r.started_at || '').substring(0, 10);\n}\n\nconst clientCalls = allRecordings.filter(recordingHasClient);\n\nconst grainInTargetWeek = clientCalls\n  .filter(r => {\n    const d = recordingDateOnly(r);\n    return d && d >= targetWeekStart && d <= targetWeekEnd;\n  })\n  .sort((a, b) => new Date(b.start_datetime || b.started_at || 0) - new Date(a.start_datetime || a.started_at || 0));\n\nif (grainInTargetWeek.length > 0) {\n  const pick = grainInTargetWeek[0];\n  // Check if Call Agendas already has this Grain ID (lets us patch the row instead of creating duplicate)\n  const existingRow = notionRows.find(r => {\n    const grainId = r?.properties?.['Grain Recording ID']?.rich_text?.[0]?.plain_text\n                 || r?.properties?.['Grain ID']?.rich_text?.[0]?.plain_text;\n    return grainId === pick.id;\n  });\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: pick.id,\n      latest_grain_call_title: pick.title || '',\n      latest_grain_call_date: pick.start_datetime || pick.started_at || new Date().toISOString(),\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : allRows.length + 1,\n      existing_agenda_row_id: existingRow ? existingRow.id : null,\n      use_existing_transcript: false,\n      used_prev_week: false,\n      selection_source: 'grain_target_week'\n    }\n  }];\n}\n\n// ── Step 3: Fall back to previous week ──────────────────────────────────────\nconst grainInPrevWeek = clientCalls\n  .filter(r => {\n    const d = recordingDateOnly(r);\n    return d && d >= prevWeekStart && d <= prevWeekEnd;\n  })\n  .sort((a, b) => new Date(b.start_datetime || b.started_at || 0) - new Date(a.start_datetime || a.started_at || 0));\n\nif (grainInPrevWeek.length > 0) {\n  const pick = grainInPrevWeek[0];\n  const existingRow = notionRows.find(r => {\n    const grainId = r?.properties?.['Grain Recording ID']?.rich_text?.[0]?.plain_text\n                 || r?.properties?.['Grain ID']?.rich_text?.[0]?.plain_text;\n    return grainId === pick.id;\n  });\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: pick.id,\n      latest_grain_call_title: pick.title || '',\n      latest_grain_call_date: pick.start_datetime || pick.started_at || new Date().toISOString(),\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : allRows.length + 1,\n      existing_agenda_row_id: existingRow ? existingRow.id : null,\n      use_existing_transcript: false,\n      used_prev_week: true,\n      selection_source: 'grain_prev_week'\n    }\n  }];\n}\n\n// ── Nothing found anywhere ──────────────────────────────────────────────────\nreturn [{ json: {\n  ...contextData, client_name: clientName, call_sign: callSign,\n  abort: true,\n  abort_reason: 'No call found for ' + clientName + ' in target week (' + targetWeekStart + ' to ' + targetWeekEnd + ') or previous week (' + prevWeekStart + ' to ' + prevWeekEnd + '). Checked Call Agendas (' + notionRows.length + ' rows) and Grain (' + clientCalls.length + ' client recordings of ' + allRecordings.length + ' total).'\n} }];"
       }
     },
     {
@@ -650,7 +650,7 @@
         580
       ],
       "parameters": {
-        "jsCode": "const contextData = $('Extract Context and Calculate Quota').first().json;\nconst rows = $input.first().json?.results || [];\n\nif (!rows.length) {\n  throw new Error(`Call Agendas is empty for ${contextData.client_name} — should have been caught by IF node. Check IF Has Existing Transcript routing.`);\n}\n\nconst row = rows[0];\nconst props = row.properties || {};\nconst transcriptUrl = props['Transcript URL']?.url || '';\nconst callTitle = props['Title']?.title?.[0]?.plain_text || 'Unknown Call';\n\nif (!transcriptUrl) {\n  throw new Error(`Latest Call Agendas row has no Transcript URL for: ${contextData.client_name}. Open that row in Notion and add the Google Doc link.`);\n}\n\nreturn [{\n  json: {\n    ...contextData,\n    agenda_row_id: row.id,\n    transcript_doc_url: transcriptUrl,\n    call_title: callTitle,\n    source: 'existing'\n  }\n}];"
+        "jsCode": "// Reads directly from Cross-check Dates output (carried through IF nodes)\nconst data = $input.first().json;\nif (!data.transcript_doc_url) {\n  throw new Error('use_existing_transcript was true but transcript_doc_url is empty. Call Agendas row may need its Transcript URL filled in for: ' + (data.call_title || data.client_name));\n}\nreturn [{\n  json: {\n    ...data,\n    source: 'existing'\n  }\n}];"
       }
     },
     {
@@ -1162,7 +1162,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "const ctx = $('Build Batch Name').first().json;\nconst batchPage = $('Create Batch Page').first().json;\nconst postLineupDb = $('Create Post Lineup Overview DB').first().json;\n\nconst batchPageId = batchPage.id;\nconst batchPageUrl = batchPage.url || `https://notion.so/${batchPageId.replace(/-/g, '')}`;\nconst postLineupDbId = postLineupDb.id;\n\nfunction normalizePlatform(raw) {\n  const r = (raw || '').toLowerCase().trim();\n  if (r === 'linkedin') return 'LinkedIn';\n  if (r === 'x/twitter' || r === 'x' || r === 'twitter') return 'X/Twitter';\n  if (r.includes('twitter') || r.includes('x/twitter')) return 'X/Twitter';\n  if (r.includes('linkedin') && !r.includes('twitter')) return 'LinkedIn';\n  return 'LinkedIn';\n}\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.batchContext = {\n  batch_page_id: batchPageId,\n  batch_page_url: batchPageUrl,\n  batch_name: ctx.batch_name,\n  client_name: ctx.client_name,\n  call_title: ctx.call_title || 'Latest Call',\n  total_posts_per_batch: ctx.total_posts_per_batch\n};\nstaticData.createdRows = [];\n\nreturn ctx.final_ideas.map((idea, index) => ({\n  json: {\n    ...idea,\n    platform: normalizePlatform(idea.platform || idea.platform_lean),\n    idea: idea.idea || idea.topic || '(untitled idea)',\n    post_lineup_db_id: postLineupDbId,\n    batch_page_id: batchPageId,\n    batch_page_url: batchPageUrl,\n    batch_name: ctx.batch_name,\n    client_name: ctx.client_name,\n    idea_index: index\n  },\n  pairedItem: { item: 0 }\n}));"
+        "jsCode": "const ctx = $('Build Batch Name').first().json;\nconst batchPage = $('Create Batch Page').first().json;\nconst postLineupDb = $('Create Post Lineup Overview DB').first().json;\n\nconst batchPageId = batchPage.id;\nconst batchPageUrl = batchPage.url || `https://notion.so/${batchPageId.replace(/-/g, '')}`;\nconst postLineupDbId = postLineupDb.id;\n\nfunction normalizePlatform(raw) {\n  const r = (raw || '').toLowerCase().trim();\n  if (r === 'linkedin') return 'LinkedIn';\n  if (r === 'x/twitter' || r === 'x' || r === 'twitter') return 'X/Twitter';\n  if (r.includes('twitter') || r.includes('x/twitter')) return 'X/Twitter';\n  if (r.includes('linkedin') && !r.includes('twitter')) return 'LinkedIn';\n  return 'LinkedIn';\n}\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.batchContext = {\n  batch_page_id: batchPageId,\n  batch_page_url: batchPageUrl,\n  batch_name: ctx.batch_name,\n  client_name: ctx.client_name,\n  call_title: ctx.call_title || 'Latest Call',\n  total_posts_per_batch: ctx.total_posts_per_batch,\n  used_prev_week: ctx.used_prev_week === true\n};\nstaticData.createdRows = [];\n\nreturn ctx.final_ideas.map((idea, index) => ({\n  json: {\n    ...idea,\n    platform: normalizePlatform(idea.platform || idea.platform_lean),\n    idea: idea.idea || idea.topic || '(untitled idea)',\n    post_lineup_db_id: postLineupDbId,\n    batch_page_id: batchPageId,\n    batch_page_url: batchPageUrl,\n    batch_name: ctx.batch_name,\n    client_name: ctx.client_name,\n    idea_index: index\n  },\n  pairedItem: { item: 0 }\n}));"
       }
     },
     {
@@ -1240,7 +1240,7 @@
         260
       ],
       "parameters": {
-        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst ctx = staticData.batchContext || {};\nconst rows = staticData.createdRows || [];\n\nconst topIdeas = rows.slice(0, 5).map((r, i) => `${i + 1}. *[${r.platform}]* ${r.idea}`).join('\\n');\nconst topNotes = rows.filter(r => r.notes_for_reviewer?.trim()).slice(0, 3).map(r => `- ${r.notes_for_reviewer}`).join('\\n');\n\nconst message = `:brain: *New Idea Batch Ready for Review!* <!channel>\\n\\n*Client:* ${ctx.client_name}\\n*Batch:* ${ctx.batch_name}\\n*Source:* Call Transcript - ${ctx.call_title}\\n*Total Ideas:* ${rows.length}\\n\\n*Top Ideas:*\\n${topIdeas}${topNotes ? `\\n\\n*AI Notes to Review:*\\n${topNotes}` : ''}\\n\\n<${ctx.batch_page_url}|View Batch in Notion>`;\n\nreturn [{ json: { slack_message: message, batch_page_url: ctx.batch_page_url, batch_name: ctx.batch_name, client_name: ctx.client_name, total_ideas: rows.length } }];"
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst ctx = staticData.batchContext || {};\nconst rows = staticData.createdRows || [];\n\nconst topIdeas = rows.slice(0, 5).map((r, i) => `${i + 1}. *[${r.platform}]* ${r.idea}`).join('\\n');\nconst topNotes = rows.filter(r => r.notes_for_reviewer?.trim()).slice(0, 3).map(r => `- ${r.notes_for_reviewer}`).join('\\n');\n\nconst prevWeekNote = ctx.used_prev_week\n  ? '\\n\\n:warning: *Note:* Used call from previous week — no call found in target week.'\n  : '';\n\nconst message = `:brain: *New Idea Batch Ready for Review!* <!channel>\\n\\n*Client:* ${ctx.client_name}\\n*Batch:* ${ctx.batch_name}\\n*Source:* Call Transcript - ${ctx.call_title}\\n*Total Ideas:* ${rows.length}${prevWeekNote}\\n\\n*Top Ideas:*\\n${topIdeas}${topNotes ? `\\n\\n*AI Notes to Review:*\\n${topNotes}` : ''}\\n\\n<${ctx.batch_page_url}|View Batch in Notion>`;\n\nreturn [{ json: { slack_message: message, batch_page_url: ctx.batch_page_url, batch_name: ctx.batch_name, client_name: ctx.client_name, total_ideas: rows.length } }];"
       }
     },
     {
@@ -1923,6 +1923,36 @@
       "parameters": {
         "mode": "append"
       }
+    },
+    {
+      "id": "use-existing-0001-4000-8000-000000000001",
+      "name": "IF Use Existing Transcript",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4200,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.use_existing_transcript }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
     }
   ],
   "connections": {
@@ -2039,30 +2069,12 @@
       "main": [
         [
           {
-            "node": "IF Fetch Latest Transcript",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF Fetch Latest Transcript": {
-      "main": [
-        [
-          {
             "node": "Query Grain All Calls",
             "type": "main",
             "index": 0
           },
           {
             "node": "Query Call Agendas for Cross-check",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Get Latest Call Agendas Row",
             "type": "main",
             "index": 0
           }
@@ -2173,17 +2185,6 @@
         [
           {
             "node": "Merge Transcript Branches",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Latest Call Agendas Row": {
-      "main": [
-        [
-          {
-            "node": "IF Has Existing Transcript",
             "type": "main",
             "index": 0
           }
@@ -2572,29 +2573,6 @@
         ]
       ]
     },
-    "IF Has Existing Transcript": {
-      "main": [
-        [
-          {
-            "node": "Package Existing Transcript Data",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Query Grain All Calls",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Query Call Agendas for Cross-check",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Get Call Agendas Schema": {
       "main": [
         [
@@ -2654,7 +2632,7 @@
       "main": [
         [
           {
-            "node": "Create Google Doc",
+            "node": "IF Use Existing Transcript",
             "type": "main",
             "index": 0
           }
@@ -2790,6 +2768,24 @@
         [
           {
             "node": "Prep Ideas for Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Use Existing Transcript": {
+      "main": [
+        [
+          {
+            "node": "Package Existing Transcript Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Google Doc",
             "type": "main",
             "index": 0
           }
