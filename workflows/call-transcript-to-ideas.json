@@ -382,7 +382,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\n\nconst preprocess = $('Pre-process Inputs').first().json || {};\nconst clientName = preprocess.client_name || contextData.client_name || '';\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst primaryEmail = (contextData.primary_email || preprocess.primary_email || '').toLowerCase();\nconst allRecordings = grainRaw?.recordings || [];\n\nif (!primaryEmail) {\n  throw new Error('Primary email is not set for ' + (clientName || 'this client') + ' in Notion. Open the Clients database, find this client\\'s row, and fill in the \\'Primary Email\\' field.');\n}\n\nconst allEmails = [...new Set(\n  allRecordings.flatMap(c => (c.participants || []).map(p => (p.email || '').toLowerCase()))\n)].filter(Boolean).sort();\nconsole.log('Grain returned ' + allRecordings.length + ' recordings. Unique participant emails (' + allEmails.length + '): ' + allEmails.slice(0, 30).join(', '));\nconsole.log('Matching against primary_email: ' + primaryEmail);\n\n// cleanName strips \"(Trial)\" etc. and lowercases for matching\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim().toLowerCase();\n\n// grainSearchName is an optional Notion field the user can set when Grain stores\n// the client under a different name (e.g. company name or nickname).\nconst grainSearchName = (contextData.grain_search_name || preprocess.grain_search_name || '').toLowerCase();\nconst searchTerms = grainSearchName || cleanName;\nconst searchWords = searchTerms.split(/\\s+/).filter(w => w.length > 2);\n\nlet grainCalls = [];\n\n// 1. Exact email match\ngrainCalls = allRecordings.filter(c => {\n  if (!c?.id) return false;\n  return (c.participants || []).some(p => (p.email || '').toLowerCase() === primaryEmail);\n});\n\n// 2. Participant name match\nif (grainCalls.length === 0 && searchTerms) {\n  console.log('Email match returned 0. Trying participant name match for: ' + searchTerms);\n  grainCalls = allRecordings.filter(c => {\n    if (!c?.id) return false;\n    return (c.participants || []).some(p => {\n      const pName = (p.name || '').toLowerCase();\n      return pName && searchWords.some(word => pName.includes(word));\n    });\n  });\n  if (grainCalls.length > 0) {\n    console.log('Participant name match found ' + grainCalls.length + ' calls for \"' + searchTerms + '\"');\n  }\n}\n\n// 3. Recording title match \u2014 Grain often stores the meeting title with the client's name\nif (grainCalls.length === 0 && searchWords.length > 0) {\n  console.log('Participant name match returned 0. Trying recording title match for: ' + searchTerms);\n  grainCalls = allRecordings.filter(c => {\n    if (!c?.id) return false;\n    const title = (c.title || '').toLowerCase();\n    return searchWords.some(word => title.includes(word));\n  });\n  if (grainCalls.length > 0) {\n    console.log('Title match found ' + grainCalls.length + ' calls matching \"' + searchTerms + '\"');\n  }\n}\n\n// 4. Last resort \u2014 most recent recording. Claude will flag if the transcript is wrong.\nif (grainCalls.length === 0) {\n  const allValid = allRecordings.filter(c => !!c?.id);\n  if (allValid.length === 0) {\n    throw new Error('No Grain recordings found at all. Check the Grain API credential.');\n  }\n  console.log('No match found for \"' + clientName + '\" (searched email, participant name, recording title). Falling back to most recent recording. If this is wrong, add a \"Grain Search Name\" property to the client page in Notion with the exact name Grain uses.');\n  grainCalls = allValid;\n}\n\nconst notionRows = notionRaw?.results || [];\n\nconst sortedGrainCalls = [...grainCalls].sort((a, b) =>\n  new Date(a.start_datetime || a.started_at || 0) - new Date(b.start_datetime || b.started_at || 0)\n);\nconst latestGrainCall = sortedGrainCalls[sortedGrainCalls.length - 1];\nconsole.log('Selected call: \"' + (latestGrainCall.title || latestGrainCall.id) + '\" (' + (latestGrainCall.start_datetime || latestGrainCall.started_at || 'no date') + ')');\n\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\nconst callNumber = callNumberOverride > 0 ? callNumberOverride : notionRows.length + 1;\n\n// call_sign: prefer Notion override, then computed initials from Pre-process Inputs\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\n\nreturn [{\n  json: {\n    ...contextData,\n    client_name: clientName,\n    call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    grain_search_name: grainSearchName,\n    latest_grain_call_id: latestGrainCall.id,\n    latest_grain_call_title: latestGrainCall.title || '',\n    latest_grain_call_date: latestGrainCall.start_datetime || latestGrainCall.started_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
+        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\n// client_name: pull from preprocess first (most reliable), fall back to contextData spread\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\n\nconst primaryEmail = (contextData.primary_email || preprocess.primary_email || '').toLowerCase().trim();\nconst allRecordings = grainRaw?.recordings || [];\nconst notionRows = notionRaw?.results || [];\n\nif (!clientName) {\n  return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty \u2014 the orchestrator did not pass it, or Pre-process Inputs failed to read it.' } }];\n}\n\nif (!primaryEmail) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign, abort: true, abort_reason: 'Primary Email is not set for ' + clientName + ' in Notion. Open the Clients database, find this client\\'s row, and add their email exactly as it appears in Grain participant lists.' } }];\n}\n\nconsole.log('Grain returned ' + allRecordings.length + ' recordings. Matching against primary_email: ' + primaryEmail);\n\n// Strict email match \u2014 no fuzzy fallbacks to prevent cross-client contamination\nconst matchedCalls = allRecordings.filter(c => {\n  if (!c?.id) return false;\n  return (c.participants || []).some(p => (p.email || '').toLowerCase().trim() === primaryEmail);\n});\n\nif (matchedCalls.length === 0) {\n  const sampleEmails = [...new Set(\n    allRecordings.flatMap(c => (c.participants || []).map(p => (p.email || '').toLowerCase()))\n  )].filter(Boolean).slice(0, 20).join(', ');\n  return [{ json: {\n    ...contextData,\n    client_name: clientName,\n    call_sign: callSign,\n    abort: true,\n    abort_reason: 'No Grain recordings matched email \"' + primaryEmail + '\" for ' + clientName + '. Grain participant emails seen: ' + (sampleEmails || '(none \u2014 participants may not be populated)') + '. Update the Primary Email in Notion to match exactly one of these.'\n  } }];\n}\n\nconst sorted = [...matchedCalls].sort((a, b) =>\n  new Date(a.start_datetime || a.started_at || 0) - new Date(b.start_datetime || b.started_at || 0)\n);\nconst latestCall = sorted[sorted.length - 1];\nconsole.log('Matched ' + matchedCalls.length + ' calls. Selected: \"' + (latestCall.title || latestCall.id) + '\" (' + (latestCall.start_datetime || latestCall.started_at || 'no date') + ')');\n\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\nconst callNumber = callNumberOverride > 0 ? callNumberOverride : notionRows.length + 1;\n\nreturn [{\n  json: {\n    ...contextData,\n    abort: false,\n    client_name: clientName,\n    call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    latest_grain_call_id: latestCall.id,\n    latest_grain_call_title: latestCall.title || '',\n    latest_grain_call_date: latestCall.start_datetime || latestCall.started_at || new Date().toISOString(),\n    new_call_number: callNumber\n  }\n}];"
       }
     },
     {
@@ -554,7 +554,7 @@
         280
       ],
       "parameters": {
-        "jsCode": "const prepData = $('Prepare Transcript for Doc').first().json;\nconst agendaRow = $('Create Call Agendas Row').first().json;\n\nreturn [{\n  json: {\n    ...prepData,\n    agenda_row_id: agendaRow.id,\n    transcript_doc_url: prepData.doc_url,\n    call_title: `Call ${prepData.new_call_number} - ${prepData.client_name} x Digital Leverage`,\n    source: 'fresh_fetch'\n  }\n}];"
+        "jsCode": "const prepData = $('Prepare Transcript for Doc').first().json;\nconst agendaRow = $('Create Call Agendas Row').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\n// client_name insurance: prepData should have it from Cross-check Dates spread,\n// but if any node in the chain dropped it, fall back to Pre-process Inputs directly.\nconst clientName = prepData.client_name || preprocess.client_name || '';\n\nreturn [{\n  json: {\n    ...prepData,\n    client_name: clientName,\n    agenda_row_id: agendaRow.id,\n    transcript_doc_url: prepData.doc_url,\n    call_title: 'Call ' + prepData.new_call_number + ' - ' + clientName + ' x Digital Leverage',\n    source: 'fresh_fetch'\n  }\n}];"
       }
     },
     {
@@ -1589,6 +1589,60 @@
       "parameters": {
         "jsCode": "const claudeResponse = $input.first().json;\nconst content = claudeResponse.content?.[0]?.text || '';\n\nlet summary = '';\nlet topics = '';\ntry {\n  const match = content.match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(match ? match[0] : content);\n  summary = parsed.summary || '';\n  const topicsArray = Array.isArray(parsed.topics) ? parsed.topics : [];\n  topics = topicsArray.map(t => `\u2022 ${t}`).join('\\n');\n} catch(e) {\n  console.log('Warning: Could not parse summary/topics response:', content.substring(0, 200));\n}\n\n// Carry through all prepData fields so downstream can access them\nconst prepData = $('Prepare Transcript for Doc').first().json;\n\nreturn [{\n  json: {\n    ...prepData,\n    call_summary: summary,\n    call_topics: topics\n  }\n}];"
       }
+    },
+    {
+      "id": "failsafe-if-0001-4000-8000-abcdef000001",
+      "name": "IF Transcript Client Match",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3900,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ String($json.abort) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "failsafe-slack-0001-4000-8000-abcdef000002",
+      "name": "Send Client Match Error to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4180,
+        460
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: 'C0B1Y5EGZPA', text: ':warning: *Call Transcript \u2192 Ideas failed for ' + $json.client_name + '*\\n\\n*Reason:* ' + $json.abort_reason + '\\n\\nNo transcript was saved and no batch was created. Fix the issue above and re-run.' }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "U9j3VSN4WONZsZml",
+          "name": "Slack API"
+        }
+      }
     }
   ],
   "connections": {
@@ -1783,7 +1837,7 @@
       "main": [
         [
           {
-            "node": "Create Google Doc",
+            "node": "IF Transcript Client Match",
             "type": "main",
             "index": 0
           }
@@ -2332,6 +2386,24 @@
         [
           {
             "node": "Build Row Properties from Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Transcript Client Match": {
+      "main": [
+        [
+          {
+            "node": "Create Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Client Match Error to Slack",
             "type": "main",
             "index": 0
           }
