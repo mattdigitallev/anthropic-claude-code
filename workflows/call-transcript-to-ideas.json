@@ -672,14 +672,14 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Extract Transcript Text').first().json;\nconst formatBankResult = $('Query Format Bank Pass 1').first().json;\n\nconst formatList = (formatBankResult.results || []).map(page => {\n  const p = page.properties || {};\n  return {\n    name: p['Format Name']?.title?.[0]?.plain_text || '',\n    description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n    when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n    platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter'\n  };\n}).filter(f => f.name);\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\n\\nINTELLIGENCE BRIEF:\\n${ctx.intel_brief_text}\\n\\nCONTENT STRATEGY (${ctx.total_posts_per_batch} posts/batch - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}):\\n${ctx.strategy_doc_text}\\n\\nWRITER'S NOTES FOR THIS BATCH:\\n${ctx.notes_for_ai || 'None'}\\n\\nCALL: ${ctx.call_title || 'Most recent call'}\\n\\nFULL TRANSCRIPT:\\n${ctx.transcript_text}\\n\\n---\\nFORMAT BANK (name | description | when to use | platform):\\n${formatList.map(f => `- ${f.name} | ${f.description} | ${f.when_to_use} | ${f.platform}`).join('\\n')}\\n\\n---\\nTARGET: Generate ${ctx.transcript_idea_quota} ideas.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. Each element:\\n{\\n  \"topic\": \"one word, two words, or one line\",\\n  \"one_of_one_opinion\": \"the unique take only this client can have\",\\n  \"content_pillar\": \"exact pillar name from the strategy doc\",\\n  \"transcript_source\": \"direct quote or clear description of the specific moment this came from\",\\n  \"format_candidates\": [\"Format Name 1\", \"Format Name 2\", \"Format Name 3\"],\\n  \"platform_lean\": \"LinkedIn or X/Twitter or Either\",\\n  \"notes_for_reviewer\": \"flags or questions for the human reviewer, empty string if none\"\\n}`;\n\nreturn [{ json: { ...ctx, format_list: formatList, mine_ideas_user_prompt: userPrompt } }];"
+        "jsCode": "const ctx = $('Extract Transcript Text').first().json;\nconst formatBankResult = $('Query Format Bank Pass 1').first().json;\nconst prevBatch = $('Format Previous Batch Context').first().json || {};\n\nconst formatList = (formatBankResult.results || []).map(page => {\n  const p = page.properties || {};\n  return {\n    name: p['Format Name']?.title?.[0]?.plain_text || '',\n    description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n    when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n    platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter'\n  };\n}).filter(f => f.name);\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\n\\nINTELLIGENCE BRIEF:\\n${ctx.intel_brief_text}\\n\\nCONTENT STRATEGY (${ctx.total_posts_per_batch} posts/batch - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}):\\n${ctx.strategy_doc_text}\\n\\nWRITER'S NOTES FOR THIS BATCH:\\n${ctx.notes_for_ai || 'None'}\\n\\nCALL: ${ctx.call_title || 'Most recent call'}\\n\\nFULL TRANSCRIPT:\\n${ctx.transcript_text}\\n\\n---\\n${prevBatch.previous_batch_block || 'PREVIOUS BATCH IDEAS: None'}\\n\\n---\\nFORMAT BANK (name | description | when to use | platform):\\n${formatList.map(f => `- ${f.name} | ${f.description} | ${f.when_to_use} | ${f.platform}`).join('\\n')}\\n\\n---\\nTARGET: Generate ${ctx.transcript_idea_quota} ideas.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. Each element:\\n{\\n  \"topic\": \"one word, two words, or one line\",\\n  \"one_of_one_opinion\": \"the unique take only this client can have\",\\n  \"content_pillar\": \"exact pillar name from the strategy doc\",\\n  \"transcript_source\": \"direct quote or clear description of the specific moment this came from\",\\n  \"format_candidates\": [\"Format Name 1\", \"Format Name 2\", \"Format Name 3\"],\\n  \"platform_lean\": \"LinkedIn or X/Twitter or Either\",\\n  \"notes_for_reviewer\": \"flags or questions for the human reviewer, empty string if none\"\\n}`;\n\nreturn [{ json: { ...ctx, format_list: formatList, mine_ideas_user_prompt: userPrompt, previous_batch_idea_count: prevBatch.previous_batch_idea_count || 0 } }];\n"
       },
       "id": "c9f60aa1-77e9-43fb-a7b8-5c5e816400c3",
       "name": "Prepare Mine Ideas Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        179184,
+        180452,
         44784
       ]
     },
@@ -704,7 +704,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 16000, system: 'You are an expert content strategist specializing in extracting high-quality social media content ideas from client call transcripts. Your role is to mine transcripts for one-of-one content ideas - moments, stories, and opinions that only this specific client can authentically share.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC - one word, two words, or one line\\n2. FORMAT - a format from the Format Bank\\n3. 1-OF-1 OPINION - the unique take only this client can have\\n\\nCALL CONTEXT AWARENESS - critical:\\nNot every call is for generating NEW ideas. Many calls review or present ideas that were already created in a prior batch, or discuss the performance of posts that already went live. Before mining, classify each segment of the transcript:\\n- NEW IDEATION: client is brainstorming, telling fresh stories, surfacing new opinions, reacting to current events, sharing recent experiences. → MINE these.\\n- REVIEW OF EXISTING IDEAS: client and team are walking through pre-built ideas/drafts/scheduled posts (\"here is the post we wrote about X\", \"what do you think of this one\"). → DO NOT mine the idea itself; it is already in the pipeline.\\n- PERFORMANCE REFLECTION: discussion of posts that already went live (\"this one did well\", \"that flopped\", \"the post on X got traction\", \"this didn\\'t perform\"). → DO NOT mine as new ideas. These are retrospectives on content that already exists.\\n- LOGISTICS / SCHEDULING / FEEDBACK ON DRAFTS: do not mine.\\n\\nNUANCE - reflections CAN spark new ideas. If a performance reflection produces a NEW angle, opinion, or follow-up the client wants to explore (e.g. \"that contrarian post did well, I want to go further on that idea and say [new specific thing]\"), that NEW extension IS mineable - but only the net-new opinion/angle, not the post being reviewed.\\n\\nSIGNAL VOCABULARY to recognize (non-exhaustive):\\n- \"this did well / didn\\'t perform / got X views / flopped / went viral\" → performance reflection\\n- \"in the last batch / we already posted / this is scheduled / the draft we sent\" → existing idea review\\n- \"I want to say / here\\'s something I\\'ve been thinking / new thought / hot take / I realized recently\" → new ideation\\n\\nQUALITY FILTERS - every idea must pass ALL 5:\\n1. Clear topic\\n2. Format candidate assigned\\n3. Genuine 1-of-1 opinion\\n4. Passes 365-day test: posting this every day for a year = brand is better off\\n5. Truly 1-of-1: ONLY this client could say this\\n\\nMINING RULES:\\n- Mine for specific stories, strong opinions, unique experiences, numbers, turning points\\n- Approve/reject signals: if the client seemed unenthusiastic about a direction on the call, discard it\\n- ONE golden nugget per idea. Never merge two separate insights\\n- Preserve the original thought. Do NOT over-synthesize\\n- ICP relevance: ideas must connect to the audience needs, not internal logistics\\n\\nCONTENT PILLAR RULES:\\n- Every idea MUST tie to a content pillar listed in the strategy\\n- No pillar = no idea\\n- Miscellaneous is ONLY allowed if explicitly defined in the strategy, and only sparingly\\n\\nANTI-HALLUCINATION RULES:\\n- Every idea must be traceable to a real, specific moment in the transcript\\n- Never invent conclusions the client did not explicitly state\\n- Never combine two separate thoughts into one\\n- If unsure whether something is new ideation vs. review of existing content, ERR ON THE SIDE OF SKIPPING. False positives (mining an already-existing idea) are worse than missing one.\\n\\nReturn ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.mine_ideas_user_prompt }] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 16000, system: 'You are an expert content strategist specializing in extracting high-quality social media content ideas from client call transcripts. Your role is to mine transcripts for one-of-one content ideas - moments, stories, and opinions that only this specific client can authentically share.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC - one word, two words, or one line\\n2. FORMAT - a format from the Format Bank\\n3. 1-OF-1 OPINION - the unique take only this client can have\\n\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—, U+2014) anywhere. Not in topics, opinions, sources, notes - anywhere. The em dash is banned. If you would naturally use one, either rewrite the sentence or use a comma, semicolon, or period.\\n- Also avoid en dashes (–, U+2013). Use a standard hyphen (-) only where a hyphen is genuinely needed (compound words like \"one-of-one\", \"365-day\"). Otherwise prefer no dash.\\n\\nTHINK HARD BEFORE MINING - WHO SAID WHAT:\\nThe transcript has multiple speakers. You must distinguish: which moments are the CLIENT speaking vs. the agency/strategist/team. One-of-one ideas must come from the CLIENT\\'S voice, opinions, experiences, and stories - not the agency framing them. If a strategist says \"you should post about X\", that is not the client\\'s 1-of-1; only mine if the client then expresses the actual opinion themselves in their own words.\\n\\nCALL CONTEXT AWARENESS - critical:\\nNot every call is for generating NEW ideas. Many calls review or present ideas that were already created in a prior batch, or discuss the performance of posts that already went live. Before mining, classify each segment of the transcript:\\n- NEW IDEATION: client is brainstorming, telling fresh stories, surfacing new opinions, reacting to current events, sharing recent experiences. MINE these.\\n- REVIEW OF EXISTING IDEAS: client and team are walking through pre-built ideas/drafts/scheduled posts (\"here is the post we wrote about X\", \"what do you think of this one\"). DO NOT mine the idea itself; it is already in the pipeline.\\n- PERFORMANCE REFLECTION: discussion of posts that already went live (\"this one did well\", \"that flopped\", \"the post on X got traction\", \"this didn\\'t perform\"). DO NOT mine as new ideas. These are retrospectives on content that already exists.\\n- LOGISTICS / SCHEDULING / FEEDBACK ON DRAFTS: do not mine.\\n\\nNUANCE - reflections CAN spark new ideas. If a performance reflection produces a NEW angle, opinion, or follow-up the client wants to explore (e.g. \"that contrarian post did well, I want to go further on that idea and say [new specific thing]\"), that NEW extension IS mineable - but only the net-new opinion/angle, not the post being reviewed.\\n\\nSIGNAL VOCABULARY to recognize (non-exhaustive):\\n- \"this did well / didn\\'t perform / got X views / flopped / went viral\" -> performance reflection\\n- \"in the last batch / we already posted / this is scheduled / the draft we sent\" -> existing idea review\\n- \"I want to say / here\\'s something I\\'ve been thinking / new thought / hot take / I realized recently\" -> new ideation\\n\\nPREVIOUS BATCH AWARENESS - if PREVIOUS BATCH IDEAS context is provided:\\nYou will receive a list of ideas from the most recent prior batch with their current statuses:\\n- Approved / Scheduled / Posted -> a GOOD idea, already in the client\\'s content pipeline. DO NOT propose a near-duplicate. If the client is now extending or evolving that idea on the call, that is fine - mine only the net-new evolution.\\n- For Review / Needs Improvement -> still pending. Treat as in-flight. Do not re-mine the same angle.\\n- Scratch -> a BAD idea that was rejected. Do not repeat this mistake. If the call surfaces a similar angle, you must add a distinct twist or skip it entirely. Use the Scratched topic/angle as a negative example of what NOT to produce.\\n\\nQUALITY FILTERS - every idea must pass ALL 5:\\n1. Clear topic\\n2. Format candidate assigned\\n3. Genuine 1-of-1 opinion\\n4. Passes 365-day test: posting this every day for a year = brand is better off\\n5. Truly 1-of-1: ONLY this client could say this\\n\\nMINING RULES:\\n- Mine for specific stories, strong opinions, unique experiences, numbers, turning points\\n- Approve/reject signals: if the client seemed unenthusiastic about a direction on the call, discard it\\n- ONE golden nugget per idea. Never merge two separate insights\\n- Preserve the original thought. Do NOT over-synthesize\\n- ICP relevance: ideas must connect to the audience needs, not internal logistics\\n\\nCONTENT PILLAR RULES:\\n- Every idea MUST tie to a content pillar listed in the strategy\\n- No pillar = no idea\\n- Miscellaneous is ONLY allowed if explicitly defined in the strategy, and only sparingly\\n\\nANTI-HALLUCINATION RULES:\\n- Every idea must be traceable to a real, specific moment in the transcript\\n- Never invent conclusions the client did not explicitly state\\n- Never combine two separate thoughts into one\\n- If unsure whether something is new ideation vs. review of existing content, ERR ON THE SIDE OF SKIPPING. False positives (mining an already-existing idea) are worse than missing one.\\n\\nReturn ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.mine_ideas_user_prompt }] }) }}",
         "options": {}
       },
       "id": "bdeb9d95-5a10-4e43-b2d0-e4613946687d",
@@ -727,7 +727,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Prepare Mine Ideas Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\n// Try strict parse first, then salvage truncated arrays (common when max_tokens is hit).\nfunction parseIdeasArray(text) {\n  // Strict first\n  const match = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (match) {\n    try { return JSON.parse(match[0]); } catch (_) { /* fall through */ }\n  }\n  // Salvage: keep everything from the first '[' up to the last complete '}', then close the array.\n  const start = text.indexOf('[');\n  if (start === -1) return null;\n  const lastClose = text.lastIndexOf('}');\n  if (lastClose <= start) return null;\n  const salvaged = text.slice(start, lastClose + 1) + ']';\n  try {\n    const parsed = JSON.parse(salvaged);\n    if (Array.isArray(parsed) && parsed.length > 0) {\n      console.log('Salvaged ' + parsed.length + ' ideas from truncated response (stop_reason=' + stopReason + ').');\n      return parsed;\n    }\n  } catch (e) {\n    // Try again, dropping the last (likely partial) object: clip to the second-to-last '}'.\n    const prevClose = text.lastIndexOf('}', lastClose - 1);\n    if (prevClose > start) {\n      const salvaged2 = text.slice(start, prevClose + 1) + ']';\n      try {\n        const parsed2 = JSON.parse(salvaged2);\n        if (Array.isArray(parsed2) && parsed2.length > 0) {\n          console.log('Salvaged ' + parsed2.length + ' ideas after dropping partial trailing object (stop_reason=' + stopReason + ').');\n          return parsed2;\n        }\n      } catch (_) { /* give up */ }\n    }\n  }\n  return null;\n}\n\nconst ideas = parseIdeasArray(content);\n\nif (!ideas) {\n  throw new Error('Failed to parse ideas from Claude (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\n}\n\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  const diag = {\n    transcript_chars: (ctx.transcript_text || '').length,\n    transcript_preview: (ctx.transcript_text || '').substring(0, 300),\n    intel_brief_chars: (ctx.intel_brief_text || '').length,\n    strategy_doc_chars: (ctx.strategy_doc_text || '').length,\n    format_list_count: (ctx.format_list || []).length,\n    notes_for_ai: ctx.notes_for_ai || '(none)',\n    total_posts_per_batch: ctx.total_posts_per_batch,\n    transcript_idea_quota: ctx.transcript_idea_quota,\n    stop_reason: stopReason,\n    claude_response: content.substring(0, 1000)\n  };\n  throw new Error('Claude returned no ideas. Diagnostics: ' + JSON.stringify(diag, null, 2));\n}\n\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\n\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames } }];\n"
+        "jsCode": "const ctx = $('Prepare Mine Ideas Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) {\n  if (typeof s !== 'string') return s;\n  return s.replace(/[—–]/g, '-');\n}\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') {\n    const out = {};\n    for (const k of Object.keys(obj)) out[k] = deepStripDashes(obj[k]);\n    return out;\n  }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const match = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (match) { try { return JSON.parse(match[0]); } catch (_) {} }\n  const start = text.indexOf('[');\n  if (start === -1) return null;\n  const lastClose = text.lastIndexOf('}');\n  if (lastClose <= start) return null;\n  try {\n    const p = JSON.parse(text.slice(start, lastClose + 1) + ']');\n    if (Array.isArray(p) && p.length > 0) { console.log('Salvaged ' + p.length + ' ideas from truncated response (stop_reason=' + stopReason + ').'); return p; }\n  } catch (e) {\n    const prev = text.lastIndexOf('}', lastClose - 1);\n    if (prev > start) {\n      try {\n        const p2 = JSON.parse(text.slice(start, prev + 1) + ']');\n        if (Array.isArray(p2) && p2.length > 0) { console.log('Salvaged ' + p2.length + ' ideas after dropping partial trailing object.'); return p2; }\n      } catch (_) {}\n    }\n  }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (!ideas) throw new Error('Failed to parse ideas from Claude (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  throw new Error('Claude returned no ideas. Stop reason: ' + stopReason + '. Response: ' + content.substring(0, 1000));\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames } }];\n"
       },
       "id": "8a2b1d7c-318c-451f-a98b-ea44feeacd95",
       "name": "Parse Ideas and Extract Format Names",
@@ -811,7 +811,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 16000, system: 'You are an expert content strategist finalizing a set of content ideas. You confirm the best format using the examples provided, assign platform, and run the full quality checklist on every idea.\\n\\nQUALITY CHECKLIST - every idea must pass ALL 5:\\n1. Has a clear topic\\n2. Has a format assigned\\n3. Has a genuine 1-of-1 opinion (only this client could say this)\\n4. Passes the 365-day test\\n5. Is truly 1-of-1\\n\\nANTI-HALLUCINATION CHECKS:\\n- Every idea must trace back to a real transcript moment\\n- No merged insights\\n- No made-up conclusions\\n- Sources column must contain real evidence\\n\\nFORMAT SELECTION:\\n- Review the examples carefully. Confirm or upgrade based on what the examples show\\n- Formats are building blocks - note if two can be combined\\n- Ensure variety across the batch: mix of lengths and format types\\n\\nPLATFORM ASSIGNMENT:\\n- Use format Platform field as primary guide\\n- For LinkedIn and X/Twitter formats, assign based on cadence split\\n\\nRemove ideas that fail the checklist and cannot be fixed.\\n\\nIDEA TITLE FORMAT:\\nThe \\\"idea\\\" field is the client-facing row title. Write it as a content pitch note that combines the format type, topic, and unique angle. Rules:\\n- Never start with the client name (no \\\"Bobby said...\\\" or first-person pronouns)\\n- It should read like a briefing note: clear, specific, intriguing\\n- Include the format descriptor when relevant (e.g. \\\"Contrarian belief post...\\\", \\\"Expanded listicle...\\\", \\\"Short-form take on...\\\")\\n\\nReturn ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.finalize_user_prompt }] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 16000, system: 'You are an expert content strategist finalizing a set of content ideas. You confirm the best format using the examples provided, assign platform, and run the full quality checklist on every idea.\\n\\nQUALITY CHECKLIST - every idea must pass ALL 5:\\n1. Has a clear topic\\n2. Has a format assigned\\n3. Has a genuine 1-of-1 opinion (only this client could say this)\\n4. Passes the 365-day test\\n5. Is truly 1-of-1\\n\\nANTI-HALLUCINATION CHECKS:\\n- Every idea must trace back to a real transcript moment\\n- No merged insights\\n- No made-up conclusions\\n- Sources column must contain real evidence\\n\\nFORMAT SELECTION:\\n- Review the examples carefully. Confirm or upgrade based on what the examples show\\n- Formats are building blocks - note if two can be combined\\n- Ensure variety across the batch: mix of lengths and format types\\n\\nPLATFORM ASSIGNMENT:\\n- Use format Platform field as primary guide\\n- For LinkedIn and X/Twitter formats, assign based on cadence split\\n\\nRemove ideas that fail the checklist and cannot be fixed.\\n\\nIDEA TITLE FORMAT:\\nThe \\\"idea\\\" field is the client-facing row title. Write it as a content pitch note that combines the format type, topic, and unique angle. Rules:\\n- Never start with the client name (no \\\"Bobby said...\\\" or first-person pronouns)\\n- It should read like a briefing note: clear, specific, intriguing\\n- Include the format descriptor when relevant (e.g. \\\"Contrarian belief post...\\\", \\\"Expanded listicle...\\\", \\\"Short-form take on...\\\")\\n\\nReturn ONLY valid JSON. No preamble, no markdown.\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—, U+2014) anywhere in your output. Not in the idea text, not in notes, sources, or topics. The em dash is banned. Use a comma, semicolon, period, or rewrite.\\n- Also avoid en dashes (–, U+2013). Use a standard hyphen (-) only where a hyphen is genuinely needed (compound words like \"one-of-one\", \"365-day\").\\n', messages: [{ role: 'user', content: $json.finalize_user_prompt }] }) }}",
         "options": {}
       },
       "id": "be2eeead-6f09-4224-a908-9704fecccc82",
@@ -834,7 +834,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Prepare Finalize Ideas Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction parseIdeasArray(text) {\n  const match = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (match) {\n    try { return JSON.parse(match[0]); } catch (_) { /* fall through */ }\n  }\n  const start = text.indexOf('[');\n  if (start === -1) return null;\n  const lastClose = text.lastIndexOf('}');\n  if (lastClose <= start) return null;\n  const salvaged = text.slice(start, lastClose + 1) + ']';\n  try {\n    const parsed = JSON.parse(salvaged);\n    if (Array.isArray(parsed) && parsed.length > 0) {\n      console.log('Salvaged ' + parsed.length + ' final ideas from truncated response (stop_reason=' + stopReason + ').');\n      return parsed;\n    }\n  } catch (e) {\n    const prevClose = text.lastIndexOf('}', lastClose - 1);\n    if (prevClose > start) {\n      const salvaged2 = text.slice(start, prevClose + 1) + ']';\n      try {\n        const parsed2 = JSON.parse(salvaged2);\n        if (Array.isArray(parsed2) && parsed2.length > 0) {\n          console.log('Salvaged ' + parsed2.length + ' final ideas after dropping partial trailing object (stop_reason=' + stopReason + ').');\n          return parsed2;\n        }\n      } catch (_) { /* give up */ }\n    }\n  }\n  return null;\n}\n\nconst finalIdeas = parseIdeasArray(content);\n\nif (!finalIdeas) {\n  throw new Error('Failed to parse finalized ideas (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\n}\n\nconst passedIdeas = finalIdeas.filter(i => i.passes_checklist !== false);\n\nif (passedIdeas.length === 0) {\n  throw new Error('No ideas passed the quality checklist. Review the transcript quality and try again.');\n}\n\nreturn [{ json: { ...ctx, final_ideas: passedIdeas, total_ideas: passedIdeas.length } }];\n"
+        "jsCode": "const ctx = $('Prepare Finalize Ideas Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const start = text.indexOf('[');\n  if (start === -1) return null;\n  const lastClose = text.lastIndexOf('}');\n  if (lastClose <= start) return null;\n  try {\n    const p = JSON.parse(text.slice(start, lastClose + 1) + ']');\n    if (Array.isArray(p) && p.length > 0) return p;\n  } catch (e) {\n    const prev = text.lastIndexOf('}', lastClose - 1);\n    if (prev > start) { try { const p2 = JSON.parse(text.slice(start, prev + 1) + ']'); if (Array.isArray(p2) && p2.length > 0) return p2; } catch (_) {} }\n  }\n  return null;\n}\n\nlet finalIdeas = parseIdeasArray(content);\nif (!finalIdeas) throw new Error('Failed to parse finalized ideas (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\n\nfinalIdeas = deepStripDashes(finalIdeas);\nconst passedIdeas = finalIdeas.filter(i => i.passes_checklist !== false);\nif (passedIdeas.length === 0) throw new Error('No ideas passed the quality checklist. Review the transcript quality and try again.');\nreturn [{ json: { ...ctx, final_ideas: passedIdeas, total_ideas: passedIdeas.length } }];\n"
       },
       "id": "bf1d646b-937b-4ad1-81bd-70a18bb4ac8d",
       "name": "Parse Final Ideas",
@@ -886,7 +886,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Parse Final Ideas').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\nconst existingBatches = $input.first().json?.results || [];\n\n// Determine next batch number from the MAX existing \"Batch N\" in page titles,\n// not the page count — otherwise deleting a batch reuses an old number.\nfunction batchPageNumber(page) {\n  const props = page.properties || {};\n  const titleProp = Object.values(props).find(p => p && p.type === 'title');\n  const title = titleProp?.title?.[0]?.plain_text || '';\n  const m = title.match(/Batch\\s+(\\d+)/i);\n  return m ? parseInt(m[1], 10) : 0;\n}\nconst maxBatchNumber = existingBatches.reduce((max, p) => Math.max(max, batchPageNumber(p)), 0);\nconst nextBatchNumber = maxBatchNumber + 1;\n\nconst callSign = ctx.call_sign || preprocess.call_sign_override || preprocess.call_sign || '';\nconst batchName = 'Batch ' + nextBatchNumber + '. ' + callSign + ' x ' + ctx.total_posts_per_batch;\nreturn [{ json: { ...ctx, batch_number: nextBatchNumber, batch_name: batchName } }];\n"
+        "jsCode": "const ctx = $('Parse Final Ideas').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\nconst existingBatches = $input.first().json?.results || [];\n\nfunction batchPageNumber(page) {\n  const props = page.properties || {};\n  const titleProp = Object.values(props).find(p => p && p.type === 'title');\n  const title = titleProp?.title?.[0]?.plain_text || '';\n  const m = title.match(/Batch\\s+(\\d+)/i);\n  return m ? parseInt(m[1], 10) : 0;\n}\nconst maxBatchNumber = existingBatches.reduce((max, p) => Math.max(max, batchPageNumber(p)), 0);\nconst nextBatchNumber = maxBatchNumber + 1;\n\nconst callSign = ctx.call_sign || preprocess.call_sign_override || preprocess.call_sign || '';\nconst batchName = 'Batch ' + nextBatchNumber + '. ' + callSign + ' x ' + ctx.total_posts_per_batch;\n\n// Recording(s) link — pull the grain call id from whichever upstream node has it.\nlet grainCallId = '';\ntry { grainCallId = $('Pick Final Transcript').first().json?.latest_grain_call_id || ''; } catch (_) {}\nif (!grainCallId) {\n  try { grainCallId = $('Cross-check Dates and Determine Call Number').first().json?.latest_grain_call_id || ''; } catch (_) {}\n}\nconst recordingUrl = grainCallId ? ('https://grain.com/share/recording/' + grainCallId) : '';\n\nreturn [{ json: { ...ctx, batch_number: nextBatchNumber, batch_name: batchName, recording_url: recordingUrl } }];\n"
       },
       "id": "1757bd38-5141-449e-a3cd-c1075260b403",
       "name": "Build Batch Name",
@@ -918,7 +918,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $('Extract Client DB IDs').first().json.master_content_db_id }, properties: { Idea: { title: [{ text: { content: $json.batch_name } }] }, Status: { status: { name: 'Ideating' } }, Created: { date: { start: new Date().toISOString().split('T')[0] } } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $('Extract Client DB IDs').first().json.master_content_db_id }, properties: { Idea: { title: [{ text: { content: $json.batch_name } }] }, Status: { status: { name: 'Ideating' } }, Created: { date: { start: new Date().toISOString().split('T')[0] } }, 'Recording(s)': { rich_text: [{ text: { content: $json.recording_url || '' } }] } } }) }}",
         "options": {}
       },
       "id": "5f9fde4f-1841-4ff3-9f0b-69dd340378f4",
@@ -1955,6 +1955,155 @@
       "parameters": {
         "jsCode": "// Aggregate every column's children and find the callout whose title text matches \"General Pages\".\n// Resources can have multiple callouts (Brand Suite, General Pages, Bespoke Pages…) — pick by name.\nconst splitItems = $('Split Resources Columns').all();\nif (splitItems.length === 1 && splitItems[0].json?._is_callout) {\n  return [{ json: { id: splitItems[0].json.id, source: 'direct' } }];\n}\n\nfunction calloutText(b) {\n  if (b.type !== 'callout') return '';\n  const rt = b.callout?.rich_text || [];\n  return rt.map(t => t?.plain_text || t?.text?.content || '').join('').trim();\n}\n\nconst allChildren = $input.all();\nconst seenCallouts = [];\n\n// First pass — exact title match for \"General Pages\"\nfor (const item of allChildren) {\n  const blocks = item.json?.results || [];\n  for (const b of blocks) {\n    if (b.type !== 'callout') continue;\n    const title = calloutText(b);\n    seenCallouts.push({ id: b.id, title });\n    if (title.toLowerCase().includes('general pages')) {\n      return [{ json: { id: b.id, source: 'column', matched_title: title } }];\n    }\n  }\n}\n\nthrow new Error('Could not find a callout titled \"General Pages\" inside Resources columns. Saw callouts: ' +\n  JSON.stringify(seenCallouts));\n"
       }
+    },
+    {
+      "id": "prevbatch-0001-4000-8000-000000000001",
+      "name": "Query Previous Batches",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        179132,
+        44984
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Extract Client DB IDs').first().json.master_content_db_id + '/query' }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"page_size\": 100 }",
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "prevbatch-0001-4000-8000-000000000002",
+      "name": "Find Previous Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        179352,
+        44984
+      ],
+      "parameters": {
+        "jsCode": "// Sort all batches by parsed Batch N descending and pick the highest.\n// This runs before the current batch has been created, so the highest is the previous batch.\nconst results = $input.first().json?.results || [];\n\nfunction parseBatchNum(page) {\n  const props = page.properties || {};\n  const titleProp = Object.values(props).find(p => p && p.type === 'title');\n  const title = titleProp?.title?.[0]?.plain_text || '';\n  const m = title.match(/Batch\\s+(\\d+)/i);\n  return { num: m ? parseInt(m[1], 10) : 0, title };\n}\n\nconst sorted = results\n  .map(p => ({ ...parseBatchNum(p), id: p.id }))\n  .filter(p => p.num > 0)\n  .sort((a, b) => b.num - a.num);\n\nif (sorted.length === 0) {\n  console.log('No prior batches found — this is the first batch.');\n  return [{ json: { has_previous: false, previous_batch_page_id: 'NO_PREVIOUS', previous_batch_number: 0, previous_batch_title: '' } }];\n}\n\nconst prev = sorted[0];\nconsole.log(`Previous batch: \"${prev.title}\" (id=${prev.id})`);\nreturn [{ json: { has_previous: true, previous_batch_page_id: prev.id, previous_batch_number: prev.num, previous_batch_title: prev.title } }];\n"
+      }
+    },
+    {
+      "id": "prevbatch-0001-4000-8000-000000000003",
+      "name": "Fetch Previous Batch Children",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        179572,
+        44984
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.previous_batch_page_id + '/children?page_size=100' }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "prevbatch-0001-4000-8000-000000000004",
+      "name": "Find Previous Content Lineup DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        179792,
+        44984
+      ],
+      "parameters": {
+        "jsCode": "const prevMeta = $('Find Previous Batch').first().json;\nif (!prevMeta.has_previous) {\n  return [{ json: { has_previous: false, has_db: false, db_id: '', previous_batch_number: 0, previous_batch_title: '' } }];\n}\n\nconst blocks = $input.first().json?.results || [];\nconst db = blocks.find(b =>\n  b.type === 'child_database' &&\n  /content lineup|post lineup/i.test(b.child_database?.title || '')\n);\nif (!db) {\n  console.log('Previous batch page had no Content Lineup child_database. Blocks: ' +\n    blocks.map(b => `${b.type}: \"${b.child_database?.title || b.child_page?.title || '?'}\"`).join(' | '));\n  return [{ json: { has_previous: true, has_db: false, db_id: 'NO_DB', previous_batch_number: prevMeta.previous_batch_number, previous_batch_title: prevMeta.previous_batch_title } }];\n}\n\nreturn [{ json: { has_previous: true, has_db: true, db_id: db.id, previous_batch_number: prevMeta.previous_batch_number, previous_batch_title: prevMeta.previous_batch_title } }];\n"
+      }
+    },
+    {
+      "id": "prevbatch-0001-4000-8000-000000000005",
+      "name": "Query Previous Batch Ideas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        180012,
+        44984
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.db_id + '/query' }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"page_size\": 100 }",
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "prevbatch-0001-4000-8000-000000000006",
+      "name": "Format Previous Batch Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180232,
+        44984
+      ],
+      "parameters": {
+        "jsCode": "const prevMeta = $('Find Previous Content Lineup DB').first().json;\nconst queryResult = $input.first().json;\n\nif (!prevMeta.has_previous || !prevMeta.has_db) {\n  const reason = !prevMeta.has_previous ? '(first batch — no previous batch to reference)' : '(previous batch had no Content Lineup database)';\n  return [{ json: { previous_batch_block: `PREVIOUS BATCH IDEAS: None ${reason}`, previous_batch_number: prevMeta.previous_batch_number || 0 } }];\n}\n\nconst rows = queryResult?.results || [];\nfunction plain(rich) { return (rich || []).map(t => t?.plain_text || '').join(''); }\nfunction getProp(props, name) {\n  const p = props?.[name];\n  if (!p) return '';\n  if (p.type === 'title')     return plain(p.title);\n  if (p.type === 'rich_text') return plain(p.rich_text);\n  if (p.type === 'select')    return p.select?.name || '';\n  if (p.type === 'status')    return p.status?.name || '';\n  if (p.type === 'multi_select') return (p.multi_select || []).map(o => o.name).join(', ');\n  return '';\n}\n\nconst ideas = rows.map(r => ({\n  idea:           getProp(r.properties, 'Idea'),\n  status:         getProp(r.properties, 'Status') || getProp(r.properties, 'Review Status'),\n  platform:       getProp(r.properties, 'Platform'),\n  content_pillar: getProp(r.properties, 'Content Pillar'),\n  topic:          getProp(r.properties, 'Topic'),\n  format:         getProp(r.properties, 'Format')\n})).filter(i => i.idea);\n\nif (ideas.length === 0) {\n  return [{ json: { previous_batch_block: `PREVIOUS BATCH IDEAS (Batch ${prevMeta.previous_batch_number}): No rows found.`, previous_batch_number: prevMeta.previous_batch_number } }];\n}\n\nconst lines = ideas.map((i, idx) => {\n  const status = i.status || '(no status)';\n  const pillar = i.content_pillar ? ` | pillar: ${i.content_pillar}` : '';\n  const topic  = i.topic ? ` | topic: ${i.topic}` : '';\n  return `${idx + 1}. [${status}] ${i.idea}${pillar}${topic}`;\n}).join('\\n');\n\nconst block = `PREVIOUS BATCH IDEAS (Batch ${prevMeta.previous_batch_number} - \"${prevMeta.previous_batch_title}\"):\\nThe following ideas were already produced in the most recent prior batch. Apply PREVIOUS BATCH AWARENESS rules from the system prompt.\\n\\n${lines}`;\nconsole.log(`Formatted ${ideas.length} previous-batch ideas for prompt context.`);\nreturn [{ json: { previous_batch_block: block, previous_batch_number: prevMeta.previous_batch_number, previous_batch_idea_count: ideas.length } }];\n"
+      }
     }
   ],
   "pinData": {},
@@ -2266,7 +2415,7 @@
       "main": [
         [
           {
-            "node": "Prepare Mine Ideas Context",
+            "node": "Query Previous Batches",
             "type": "main",
             "index": 0
           }
@@ -2828,6 +2977,72 @@
         [
           {
             "node": "Fetch General Pages Callout Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Previous Batches": {
+      "main": [
+        [
+          {
+            "node": "Find Previous Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Previous Batch": {
+      "main": [
+        [
+          {
+            "node": "Fetch Previous Batch Children",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Previous Batch Children": {
+      "main": [
+        [
+          {
+            "node": "Find Previous Content Lineup DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Previous Content Lineup DB": {
+      "main": [
+        [
+          {
+            "node": "Query Previous Batch Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Previous Batch Ideas": {
+      "main": [
+        [
+          {
+            "node": "Format Previous Batch Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Previous Batch Context": {
+      "main": [
+        [
+          {
+            "node": "Prepare Mine Ideas Context",
             "type": "main",
             "index": 0
           }
