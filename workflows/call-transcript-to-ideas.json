@@ -10,7 +10,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        171040,
+        171240,
         44784
       ]
     },
@@ -43,7 +43,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        171632,
+        171832,
         44784
       ],
       "credentials": {
@@ -62,7 +62,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        171904,
+        172104,
         44784
       ]
     },
@@ -150,7 +150,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        173584,
+        173784,
         44784
       ]
     },
@@ -244,7 +244,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        174032,
+        174232,
         44784
       ],
       "credentials": {
@@ -261,7 +261,7 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        174432,
+        174632,
         44768
       ]
     },
@@ -274,7 +274,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        174624,
+        174824,
         44768
       ]
     },
@@ -341,7 +341,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        174992,
+        175192,
         44768
       ],
       "credentials": {
@@ -516,7 +516,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        176944,
+        177144,
         44784
       ]
     },
@@ -579,7 +579,7 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        177792,
+        177992,
         44784
       ]
     },
@@ -592,7 +592,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        178064,
+        178264,
         44784
       ]
     },
@@ -608,7 +608,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        178352,
+        178552,
         44784
       ],
       "credentials": {
@@ -627,7 +627,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        178624,
+        178824,
         44784
       ]
     },
@@ -660,7 +660,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        178912,
+        179112,
         44784
       ],
       "credentials": {
@@ -679,7 +679,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        180452,
+        180652,
         44784
       ]
     },
@@ -712,7 +712,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        179472,
+        179672,
         44784
       ],
       "retryOnFail": true,
@@ -734,7 +734,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        179744,
+        179944,
         44784
       ]
     },
@@ -767,7 +767,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        180032,
+        180232,
         44784
       ],
       "credentials": {
@@ -786,7 +786,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        180304,
+        180504,
         44784
       ]
     },
@@ -819,7 +819,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        180592,
+        180792,
         44784
       ],
       "retryOnFail": true,
@@ -841,7 +841,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        180864,
+        181064,
         44784
       ]
     },
@@ -874,7 +874,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        181152,
+        181352,
         44784
       ],
       "credentials": {
@@ -893,7 +893,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        181424,
+        181624,
         44784
       ]
     },
@@ -926,7 +926,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        181712,
+        181912,
         44784
       ],
       "credentials": {
@@ -984,7 +984,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        182272,
+        182472,
         44784
       ]
     },
@@ -997,7 +997,7 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        182544,
+        182744,
         44784
       ]
     },
@@ -1135,17 +1135,6 @@
       ]
     },
     {
-      "parameters": {},
-      "id": "7a8cf65e-d097-4b07-a354-1a441d71f7b0",
-      "name": "Manual Test Trigger",
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
-      "position": [
-        171072,
-        44592
-      ]
-    },
-    {
       "parameters": {
         "url": "={{ 'https://api.notion.com/v1/blocks/' + $json.dashboard_page_id + '/children?page_size=100' }}",
         "authentication": "predefinedCredentialType",
@@ -1166,7 +1155,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        172192,
+        172392,
         44784
       ],
       "credentials": {
@@ -1197,7 +1186,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        172464,
+        172664,
         44784
       ],
       "credentials": {
@@ -1228,7 +1217,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        172752,
+        172952,
         44784
       ],
       "credentials": {
@@ -1410,7 +1399,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        174800,
+        175000,
         44768
       ]
     },
@@ -1486,7 +1475,7 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
       "position": [
-        171312,
+        171512,
         44784
       ],
       "credentials": {
@@ -1740,49 +1729,6 @@
       "position": [
         182784,
         45344
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "oyQgOUsxQsxmUvK8",
-          "name": "Notion account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "pollTimes": {
-          "item": [
-            {
-              "mode": "everyX",
-              "value": 5,
-              "unit": "minutes"
-            }
-          ]
-        },
-        "databaseId": {
-          "__rl": true,
-          "value": "5aa66f21-23b4-45c3-8324-cf3354b2ee85",
-          "mode": "list",
-          "cachedResultName": "Ideation Launcher",
-          "cachedResultUrl": "https://www.notion.so/5aa66f2123b445c38324cf3354b2ee85"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "key": "Status|select",
-              "condition": "equals",
-              "selectValue": "Pending"
-            }
-          ]
-        }
-      },
-      "id": "637b73a3-95e2-4fdf-969a-2f2b7bb5041c",
-      "name": "Notion: New Ideation Launcher Submission1",
-      "type": "n8n-nodes-base.notionTrigger",
-      "typeVersion": 1,
-      "position": [
-        170736,
-        44784
       ],
       "credentials": {
         "notionApi": {
@@ -2122,11 +2068,42 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        170936,
+        171136,
         44784
       ],
       "parameters": {
         "jsCode": "// Submission Status Gate\n// Only let the workflow run when the Notion row's Status is the \"fresh\" state.\n// The Ideation Launcher DB has these options: pending, processing, done, failed.\n// New form submissions arrive with Status = pending (or sometimes null if not defaulted).\n// Anything else means another execution has already taken this row — skip silently.\n\nconst item = $input.first().json;\nconst rawStatus = item.Status ?? item.status ?? null;\nconst statusText = (typeof rawStatus === 'string')\n  ? rawStatus.trim().toLowerCase()\n  : (rawStatus?.name?.toLowerCase?.() || '');\n\nconst allowed = ['', 'pending', 'new'];\nconst isFresh = allowed.includes(statusText);\n\nif (!isFresh) {\n  console.log(`Submission ${item.id} skipped — Status=\"${rawStatus}\" (gate only accepts empty / pending).`);\n  return [];\n}\n\nconsole.log(`Submission ${item.id} accepted (Status=\"${rawStatus ?? 'null'}\").`);\nreturn [{ json: item }];\n"
+      }
+    },
+    {
+      "id": "webhook-trigger-0001-4000-8000-000000000001",
+      "name": "Webhook: New Ideation Launcher Submission",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        170736,
+        44784
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ideation-launcher-submission",
+        "responseMode": "onReceived",
+        "responseData": "noData",
+        "options": {}
+      },
+      "webhookId": "f7cbd95e-5081-46fc-92c7-73a9e936e59d"
+    },
+    {
+      "id": "webhook-normalize-0001-4000-8000-000000000001",
+      "name": "Normalize Notion Webhook Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        170936,
+        44784
+      ],
+      "parameters": {
+        "jsCode": "// Normalize Notion Webhook Payload\n// Notion's \"Send webhook\" automation posts the raw Notion page object. Pre-process Inputs\n// expects the flattened shape that the legacy polling trigger emitted. Bridge the two here.\n// Tolerant of three shapes the automation might use: {data:{...page}}, {page:{...}}, or the page directly.\n\nconst body = $input.first().json || {};\nconst page = body.data || body.page || body;\nconst props = page.properties || {};\n\nfunction plain(rich) {\n  return (rich || []).map(t => t?.plain_text || t?.text?.content || '').join('');\n}\n\nfunction readProp(p) {\n  if (!p) return null;\n  switch (p.type) {\n    case 'title':            return plain(p.title);\n    case 'rich_text':        return plain(p.rich_text);\n    case 'select':           return p.select?.name ?? null;\n    case 'status':           return p.status?.name ?? null;\n    case 'multi_select':     return (p.multi_select || []).map(o => o.name);\n    case 'date':             return p.date ?? null;\n    case 'checkbox':         return !!p.checkbox;\n    case 'number':           return p.number ?? null;\n    case 'people':           return (p.people || []).map(per => per.person?.email || per.name || per.id);\n    case 'email':            return p.email ?? null;\n    case 'phone_number':     return p.phone_number ?? null;\n    case 'url':              return p.url ?? null;\n    case 'created_time':     return p.created_time ?? null;\n    case 'last_edited_time': return p.last_edited_time ?? null;\n    case 'formula':          return p.formula?.string ?? p.formula?.number ?? p.formula?.boolean ?? null;\n    default: return null;\n  }\n}\n\nconst flat = { id: page.id };\nfor (const [key, prop] of Object.entries(props)) {\n  flat[key] = readProp(prop);\n}\n\nconsole.log(`Normalized submission ${flat.id} — keys: ${Object.keys(flat).join(', ')}`);\nreturn [{ json: flat }];\n"
       }
     }
   ],
@@ -2640,11 +2617,6 @@
         ]
       ]
     },
-    "Manual Test Trigger": {
-      "main": [
-        []
-      ]
-    },
     "Fetch Dashboard Blocks": {
       "main": [
         [
@@ -2908,17 +2880,6 @@
         ]
       ]
     },
-    "Notion: New Ideation Launcher Submission1": {
-      "main": [
-        [
-          {
-            "node": "Submission Status Gate",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Find Resources Page": {
       "main": [
         [
@@ -3078,6 +3039,28 @@
         [
           {
             "node": "Pre-process Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: New Ideation Launcher Submission": {
+      "main": [
+        [
+          {
+            "node": "Normalize Notion Webhook Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Notion Webhook Payload": {
+      "main": [
+        [
+          {
+            "node": "Submission Status Gate",
             "type": "main",
             "index": 0
           }
