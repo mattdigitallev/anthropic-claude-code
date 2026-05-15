@@ -620,7 +620,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const contextData = $('Pick Final Transcript').first().json;\nconst docData = $input.first().json;\n\nfunction extractDocText(doc) {\n  if (!doc.body?.content) return '';\n  let text = '';\n  for (const el of doc.body.content) {\n    if (el.paragraph) {\n      for (const e of el.paragraph.elements || []) {\n        if (e.textRun) text += e.textRun.content || '';\n      }\n    }\n  }\n  return text;\n}\n\nconst text = extractDocText(docData).trim();\n\n// Guard against placeholder content: a previous run failed to fetch the Grain transcript,\n// wrote \"[Transcript not yet available — add manually]\" to the doc, and saved the doc URL\n// to a Call Agendas row. If this run reuses that row, the \"transcript\" is just the placeholder.\nconst placeholderPatterns = [\n  /transcript not yet available/i,\n  /add manually/i\n];\nconst looksLikePlaceholder = text.length < 200 && placeholderPatterns.some(rx => rx.test(text));\n\nif (!text || looksLikePlaceholder) {\n  const callTitle = contextData.call_title || contextData.latest_grain_call_title || '(unknown call)';\n  const docUrl = contextData.transcript_doc_url || contextData.doc_url || '(no doc URL)';\n  const reason = !text\n    ? 'transcript Google Doc is empty'\n    : 'transcript Google Doc contains only the placeholder text from a previous failed Grain fetch';\n  throw new Error(\n    'Cannot mine ideas: ' + reason + '. Call: \"' + callTitle + '\". Doc: ' + docUrl + '. ' +\n    'Fix: either (a) paste the real transcript into that Google Doc, or (b) delete the Call Agendas row so the workflow re-fetches from Grain on the next run.'\n  );\n}\n\nreturn [{ json: { ...contextData, transcript_text: text } }];\n"
+        "jsCode": "const contextData = $('Pick Final Transcript').first().json;\nconst docData = $input.first().json;\n\nfunction extractDocText(doc) {\n  if (!doc.body?.content) return { text: '', endIndex: 1 };\n  let text = '';\n  let endIndex = 1;\n  for (const el of doc.body.content) {\n    if (typeof el.endIndex === 'number') endIndex = Math.max(endIndex, el.endIndex);\n    if (el.paragraph) {\n      for (const e of el.paragraph.elements || []) {\n        if (e.textRun) text += e.textRun.content || '';\n      }\n    }\n  }\n  return { text, endIndex };\n}\n\nconst { text, endIndex } = extractDocText(docData);\nconst trimmed = text.trim();\n\n// Placeholder detection: previous run wrote \"[Transcript not yet available — add manually]\"\n// to the doc because the Grain fetch failed. We DON'T throw here — we set a flag and let\n// the IF + re-fetch chain handle recovery.\nconst placeholderPatterns = [/transcript not yet available/i, /add manually/i];\nconst isPlaceholder = trimmed.length < 200 && placeholderPatterns.some(rx => rx.test(trimmed));\n\n// Extract the doc id from the URL once so downstream nodes don't have to.\nconst docUrl = contextData.transcript_doc_url || contextData.doc_url || '';\nconst docId = (docUrl.match(/\\/d\\/([a-zA-Z0-9_-]+)/) || [])[1] || '';\n\nconsole.log(`Extract Transcript Text — len=${trimmed.length}, endIndex=${endIndex}, placeholder=${isPlaceholder}, doc_id=${docId}`);\n\nreturn [{\n  json: {\n    ...contextData,\n    transcript_text: isPlaceholder ? '' : text,\n    transcript_doc_end_index: endIndex,\n    transcript_doc_id: docId,\n    transcript_is_placeholder: isPlaceholder\n  }\n}];\n"
       },
       "id": "332ae00a-d795-4b8f-894a-4a9ceddd515b",
       "name": "Extract Transcript Text",
@@ -672,7 +672,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Extract Transcript Text').first().json;\nconst formatBankResult = $('Query Format Bank Pass 1').first().json;\nconst prevBatch = $('Format Previous Batch Context').first().json || {};\n\nconst formatList = (formatBankResult.results || []).map(page => {\n  const p = page.properties || {};\n  return {\n    name: p['Format Name']?.title?.[0]?.plain_text || '',\n    description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n    when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n    platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter'\n  };\n}).filter(f => f.name);\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\n\\nINTELLIGENCE BRIEF:\\n${ctx.intel_brief_text}\\n\\nCONTENT STRATEGY (${ctx.total_posts_per_batch} posts/batch - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}):\\n${ctx.strategy_doc_text}\\n\\nWRITER'S NOTES FOR THIS BATCH:\\n${ctx.notes_for_ai || 'None'}\\n\\nCALL: ${ctx.call_title || 'Most recent call'}\\n\\nFULL TRANSCRIPT:\\n${ctx.transcript_text}\\n\\n---\\n${prevBatch.previous_batch_block || 'PREVIOUS BATCH IDEAS: None'}\\n\\n---\\nFORMAT BANK (name | description | when to use | platform):\\n${formatList.map(f => `- ${f.name} | ${f.description} | ${f.when_to_use} | ${f.platform}`).join('\\n')}\\n\\n---\\nTARGET: Generate ${ctx.transcript_idea_quota} ideas.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. Each element:\\n{\\n  \"topic\": \"one word, two words, or one line\",\\n  \"one_of_one_opinion\": \"the unique take only this client can have\",\\n  \"content_pillar\": \"exact pillar name from the strategy doc\",\\n  \"transcript_source\": \"direct quote or clear description of the specific moment this came from\",\\n  \"format_candidates\": [\"Format Name 1\", \"Format Name 2\", \"Format Name 3\"],\\n  \"platform_lean\": \"LinkedIn or X/Twitter or Either\",\\n  \"notes_for_reviewer\": \"flags or questions for the human reviewer, empty string if none\"\\n}`;\n\nreturn [{ json: { ...ctx, format_list: formatList, mine_ideas_user_prompt: userPrompt, previous_batch_idea_count: prevBatch.previous_batch_idea_count || 0 } }];\n"
+        "jsCode": "const ctx = $input.first().json;\nconst formatBankResult = $('Query Format Bank Pass 1').first().json;\nconst prevBatch = $('Format Previous Batch Context').first().json || {};\n\nconst formatList = (formatBankResult.results || []).map(page => {\n  const p = page.properties || {};\n  return {\n    name: p['Format Name']?.title?.[0]?.plain_text || '',\n    description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n    when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n    platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter'\n  };\n}).filter(f => f.name);\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\n\\nINTELLIGENCE BRIEF:\\n${ctx.intel_brief_text}\\n\\nCONTENT STRATEGY (${ctx.total_posts_per_batch} posts/batch - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}):\\n${ctx.strategy_doc_text}\\n\\nWRITER'S NOTES FOR THIS BATCH:\\n${ctx.notes_for_ai || 'None'}\\n\\nCALL: ${ctx.call_title || 'Most recent call'}\\n\\nFULL TRANSCRIPT:\\n${ctx.transcript_text}\\n\\n---\\n${prevBatch.previous_batch_block || 'PREVIOUS BATCH IDEAS: None'}\\n\\n---\\nFORMAT BANK (name | description | when to use | platform):\\n${formatList.map(f => `- ${f.name} | ${f.description} | ${f.when_to_use} | ${f.platform}`).join('\\n')}\\n\\n---\\nTARGET: Generate ${ctx.transcript_idea_quota} ideas.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. Each element:\\n{\\n  \"topic\": \"one word, two words, or one line\",\\n  \"one_of_one_opinion\": \"the unique take only this client can have\",\\n  \"content_pillar\": \"exact pillar name from the strategy doc\",\\n  \"transcript_source\": \"direct quote or clear description of the specific moment this came from\",\\n  \"format_candidates\": [\"Format Name 1\", \"Format Name 2\", \"Format Name 3\"],\\n  \"platform_lean\": \"LinkedIn or X/Twitter or Either\",\\n  \"notes_for_reviewer\": \"flags or questions for the human reviewer, empty string if none\"\\n}`;\n\nreturn [{ json: { ...ctx, format_list: formatList, mine_ideas_user_prompt: userPrompt, previous_batch_idea_count: prevBatch.previous_batch_idea_count || 0 } }];\n"
       },
       "id": "c9f60aa1-77e9-43fb-a7b8-5c5e816400c3",
       "name": "Prepare Mine Ideas Context",
@@ -2105,6 +2105,139 @@
       "parameters": {
         "jsCode": "// Normalize Notion Webhook Payload\n// n8n's Webhook trigger wraps the incoming request as { headers, query, body }.\n// Notion's \"Send webhook\" automation puts the page object at body.data.\n\nconst wrapper = $input.first().json || {};\nconst body = wrapper.body || wrapper;\nconst page = body.data || body.page || body;\nconst props = page.properties || {};\n\nfunction plain(rich) {\n  return (rich || []).map(t => t?.plain_text || t?.text?.content || '').join('');\n}\n\nfunction readProp(p) {\n  if (!p) return null;\n  switch (p.type) {\n    case 'title':            return plain(p.title);\n    case 'rich_text':        return plain(p.rich_text);\n    case 'select':           return p.select?.name ?? null;\n    case 'status':           return p.status?.name ?? null;\n    case 'multi_select':     return (p.multi_select || []).map(o => o.name);\n    case 'date':             return p.date ?? null;\n    case 'checkbox':         return !!p.checkbox;\n    case 'number':           return p.number ?? null;\n    case 'people':           return (p.people || []).map(per => per.person?.email || per.name || per.id);\n    case 'email':            return p.email ?? null;\n    case 'phone_number':     return p.phone_number ?? null;\n    case 'url':              return p.url ?? null;\n    case 'created_time':     return p.created_time ?? null;\n    case 'last_edited_time': return p.last_edited_time ?? null;\n    case 'formula':          return p.formula?.string ?? p.formula?.number ?? p.formula?.boolean ?? null;\n    default: return null;\n  }\n}\n\nif (!page.id) {\n  throw new Error('Webhook payload missing page id. Top-level keys: ' + Object.keys(wrapper).join(', ') +\n                  '; body keys: ' + (body && typeof body === 'object' ? Object.keys(body).join(', ') : '(none)'));\n}\n\nconst flat = { id: page.id };\nfor (const [key, prop] of Object.entries(props)) {\n  flat[key] = readProp(prop);\n}\n\nconsole.log(`Normalized submission ${flat.id} — keys: ${Object.keys(flat).join(', ')}`);\nreturn [{ json: flat }];\n"
       }
+    },
+    {
+      "id": "recover-placeholder-0001-4000-8000-000000000001",
+      "name": "IF Transcript Is Placeholder",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        179044,
+        44784
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "placeholder_true",
+              "leftValue": "={{ $json.transcript_is_placeholder }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "recover-placeholder-0001-4000-8000-000000000002",
+      "name": "Re-fetch Grain Transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        179264,
+        44684
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.grain.com/_/public-api/v2/recordings/' + $json.latest_grain_call_id + '/transcript.txt' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Public-Api-Version",
+              "value": "2025-10-31"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2xe5Fu89Y7JRKtxW",
+          "name": "Grain API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "recover-placeholder-0001-4000-8000-000000000003",
+      "name": "Build Doc Overwrite Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        179484,
+        44684
+      ],
+      "parameters": {
+        "jsCode": "// Build a Google Docs batchUpdate that deletes the placeholder and inserts the freshly fetched transcript.\nconst previous = $('Extract Transcript Text').first().json;\nconst refetchResp = $input.first().json;\n\nconst fetchFailed = !!refetchResp?.error || !!refetchResp?.code;\nconst newTranscriptText = fetchFailed ? '' : (refetchResp?.data || '').trim();\n\nif (!newTranscriptText) {\n  throw new Error('Re-fetch from Grain returned no transcript text. The recording may not yet have a transcript available, or the Grain ID is invalid. Recording ID: ' + (previous.latest_grain_call_id || '(unknown)') + '.');\n}\n\nconst docId = previous.transcript_doc_id;\nif (!docId) {\n  throw new Error('Cannot overwrite doc: no doc_id available. transcript_doc_url=' + (previous.transcript_doc_url || '(none)'));\n}\n\nconst endIndex = previous.transcript_doc_end_index || 1;\nconst requests = [];\n// Delete existing content (1 to endIndex-1 — leave the trailing newline that Google requires).\nif (endIndex > 2) {\n  requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex: endIndex - 1 } } });\n}\nrequests.push({ insertText: { location: { index: 1 }, text: newTranscriptText } });\n\nconsole.log(`Overwriting doc ${docId}: delete [1, ${endIndex - 1}), insert ${newTranscriptText.length} chars.`);\nreturn [{\n  json: {\n    ...previous,\n    transcript_text: newTranscriptText,\n    overwrite_doc_id: docId,\n    overwrite_body: { requests }\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "recover-placeholder-0001-4000-8000-000000000004",
+      "name": "Overwrite Google Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        179704,
+        44684
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://docs.googleapis.com/v1/documents/' + $json.overwrite_doc_id + ':batchUpdate' }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.overwrite_body) }}",
+        "nodeCredentialType": "googleOAuth2Api"
+      },
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "AloBHpx18tpSVq93",
+          "name": "Google account"
+        }
+      }
+    },
+    {
+      "id": "recover-placeholder-0001-4000-8000-000000000005",
+      "name": "Build Refreshed Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        179924,
+        44684
+      ],
+      "parameters": {
+        "jsCode": "// After the doc has been overwritten, package the data in the same shape that\n// Extract Transcript Text would have emitted on the happy path. This lets the\n// downstream Query Format Bank Pass 1 (and all references to Extract Transcript Text)\n// work without knowing we took the recovery branch.\nconst prev = $('Build Doc Overwrite Body').first().json;\nconsole.log(`Refreshed transcript ready: ${(prev.transcript_text || '').length} chars.`);\nreturn [{\n  json: {\n    ...prev,\n    transcript_text: prev.transcript_text,\n    transcript_is_placeholder: false,\n    recovered_from_placeholder: true\n  }\n}];\n"
+      }
     }
   ],
   "pinData": {},
@@ -2405,7 +2538,7 @@
       "main": [
         [
           {
-            "node": "Query Format Bank Pass 1",
+            "node": "IF Transcript Is Placeholder",
             "type": "main",
             "index": 0
           }
@@ -3061,6 +3194,68 @@
         [
           {
             "node": "Submission Status Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Transcript Is Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Re-fetch Grain Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Query Format Bank Pass 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-fetch Grain Transcript": {
+      "main": [
+        [
+          {
+            "node": "Build Doc Overwrite Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Doc Overwrite Body": {
+      "main": [
+        [
+          {
+            "node": "Overwrite Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Overwrite Google Doc": {
+      "main": [
+        [
+          {
+            "node": "Build Refreshed Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Refreshed Context": {
+      "main": [
+        [
+          {
+            "node": "Query Format Bank Pass 1",
             "type": "main",
             "index": 0
           }
