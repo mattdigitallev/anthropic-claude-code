@@ -2391,6 +2391,52 @@
       "parameters": {
         "jsCode": "const ctx = $('Build Fallback Mine Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const emptyMatch = text.match(/\\[\\s*\\]/);\n  if (emptyMatch) { try { return JSON.parse(emptyMatch[0]); } catch (_) {} }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (ideas === null) throw new Error('Fallback Mine: failed to parse Claude response (stop_reason=' + stopReason + '). Response: ' + content.substring(0, 800));\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  throw new Error('Fallback Mine also returned 0 ideas. Both the most recent call and the next-most-recent call yielded no mineable content for ' + (ctx.client_name || 'this client') + '. Manually pick a Grain URL via Notes for AI and re-submit.');\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nconsole.log(`Fallback Mine succeeded with ${ideas.length} idea(s).`);\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames, is_empty: false } }];\n"
       }
+    },
+    {
+      "id": "enrich-date-0001-4000-8000-000000000001",
+      "name": "Fetch Grain Recording Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        175044,
+        44768
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.grain.com/_/public-api/v2/recordings/' + $json.latest_grain_call_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Public-Api-Version",
+              "value": "2025-10-31"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2xe5Fu89Y7JRKtxW",
+          "name": "Grain API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "enrich-date-0001-4000-8000-000000000002",
+      "name": "Enrich Call Date",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        175264,
+        44768
+      ],
+      "parameters": {
+        "jsCode": "// Some override paths (notes_override_id_only) leave latest_grain_call_date empty because the\n// recording wasn't returned by the bulk Grain listing — even though the transcript fetch works.\n// We fetch the recording's metadata directly so the Call Date column always gets populated.\nconst crosscheck = $('Cross-check Dates and Determine Call Number').first().json;\nconst metaResp = $input.first().json;\nconst metaFailed = !!metaResp?.error || !!metaResp?.code;\n\nif (crosscheck.latest_grain_call_date) {\n  return [{ json: crosscheck }];\n}\n\nif (metaFailed || !metaResp) {\n  console.log('Recording metadata fetch did not return data. Call Date will remain blank.');\n  return [{ json: crosscheck }];\n}\n\nconst candidates = [\n  metaResp.start_datetime, metaResp.started_at, metaResp.recorded_at,\n  metaResp.meeting_start_at, metaResp.meeting_started_at, metaResp.record_started_at,\n  metaResp.created_at\n];\nlet resolved = '';\nfor (const c of candidates) {\n  if (c == null || c === '') continue;\n  if (typeof c === 'number') { resolved = new Date(c * (c < 1e12 ? 1000 : 1)).toISOString(); break; }\n  if (typeof c === 'string') { resolved = c; break; }\n}\n\nif (resolved) {\n  console.log(`Enriched latest_grain_call_date from recording metadata: ${resolved}`);\n  return [{ json: { ...crosscheck, latest_grain_call_date: resolved } }];\n}\n\nconsole.log('Recording metadata had no usable date fields. Call Date will remain blank.');\nreturn [{ json: crosscheck }];\n"
+      }
     }
   ],
   "pinData": {},
@@ -2508,7 +2554,7 @@
       "main": [
         [
           {
-            "node": "IF Transcript Client Match",
+            "node": "Fetch Grain Recording Metadata",
             "type": "main",
             "index": 0
           }
@@ -3482,6 +3528,28 @@
         [
           {
             "node": "Query Format Bank Pass 2 Examples",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Grain Recording Metadata": {
+      "main": [
+        [
+          {
+            "node": "Enrich Call Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Call Date": {
+      "main": [
+        [
+          {
+            "node": "IF Transcript Client Match",
             "type": "main",
             "index": 0
           }
