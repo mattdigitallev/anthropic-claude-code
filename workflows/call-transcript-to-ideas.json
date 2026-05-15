@@ -1753,7 +1753,9 @@
         "pollTimes": {
           "item": [
             {
-              "mode": "everyMinute"
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
             }
           ]
         },
@@ -1763,6 +1765,15 @@
           "mode": "list",
           "cachedResultName": "Ideation Launcher",
           "cachedResultUrl": "https://www.notion.so/5aa66f2123b445c38324cf3354b2ee85"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status|select",
+              "condition": "equals",
+              "selectValue": "Pending"
+            }
+          ]
         }
       },
       "id": "637b73a3-95e2-4fdf-969a-2f2b7bb5041c",
