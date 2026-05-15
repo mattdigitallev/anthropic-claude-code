@@ -267,7 +267,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\nconst primaryEmail   = (contextData.primary_email   || '').toLowerCase().trim();\nconst secondaryEmail = (contextData.secondary_email || '').toLowerCase().trim();\n\nconst allRecordings = (grainRaw?.recordings || []).filter(c => !!c?.id);\nconst notionRows = notionRaw?.results || [];\nconst allRows = notionRows;\n\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\n\nconst MIN_DURATION_SEC = 600; // Anything shorter is treated as a dud (no-show / brief sync).\n\nfunction pickRecordingDate(r) {\n  if (!r) return '';\n  const candidates = [r.start_datetime, r.started_at, r.recorded_at, r.meeting_start_at, r.meeting_started_at, r.record_started_at, r.created_at];\n  for (const c of candidates) {\n    if (c == null || c === '') continue;\n    if (typeof c === 'number') return new Date(c * (c < 1e12 ? 1000 : 1)).toISOString();\n    if (typeof c === 'string') return c;\n  }\n  return '';\n}\nfunction recordingDurationSec(r) {\n  if (typeof r?.duration === 'number') return r.duration;\n  if (typeof r?.duration_seconds === 'number') return r.duration_seconds;\n  const start = pickRecordingDate(r);\n  const end = r?.end_datetime || r?.ended_at || r?.meeting_end_at || '';\n  if (start && end) {\n    const s = new Date(start).getTime();\n    const e = new Date(end).getTime();\n    if (!isNaN(s) && !isNaN(e) && e > s) return Math.round((e - s) / 1000);\n  }\n  return 0;\n}\n\nfunction rowCallTitle(row) {\n  const props = row?.properties || {};\n  for (const [, v] of Object.entries(props)) {\n    if (v?.type === 'title') {\n      const t = (v.title || []).map(rt => rt?.plain_text || '').join('');\n      if (t) return t;\n    }\n  }\n  return '';\n}\nfunction rowCallNumber(row) {\n  const m = (rowCallTitle(row) || '').match(/Call\\s+(\\d+)/i);\n  return m ? parseInt(m[1], 10) : 0;\n}\nfunction rowCallDate(row) {\n  return row?.properties?.['Call Date']?.date?.start || '';\n}\nfunction rowTranscriptUrl(row) {\n  return row?.properties?.['Transcript URL']?.url\n    || row?.properties?.['Transcript Doc']?.url\n    || row?.properties?.['Transcript Link']?.url\n    || row?.properties?.['Transcript']?.url\n    || '';\n}\nfunction rowGrainIdText(row) {\n  return row?.properties?.['Grain Recording ID']?.rich_text?.[0]?.plain_text\n    || row?.properties?.['Grain ID']?.rich_text?.[0]?.plain_text\n    || '';\n}\nfunction rowContainsGrainId(row, grainId) {\n  if (!grainId) return false;\n  for (const [, v] of Object.entries(row?.properties || {})) {\n    if (!v) continue;\n    if (v.type === 'url' && v.url && v.url.includes(grainId)) return true;\n    if (v.type === 'rich_text') {\n      const t = (v.rich_text || []).map(rt => rt?.plain_text || '').join('');\n      if (t.includes(grainId)) return true;\n    }\n    if (v.type === 'title') {\n      const t = (v.title || []).map(rt => rt?.plain_text || '').join('');\n      if (t.includes(grainId)) return true;\n    }\n  }\n  return false;\n}\nfunction findRowByGrainId(grainId) {\n  return notionRows.find(r => rowGrainIdText(r) === grainId || rowContainsGrainId(r, grainId));\n}\n\nconst maxCallNumber = allRows.reduce((max, r) => Math.max(max, rowCallNumber(r)), 0);\nconst nextCallNumber = maxCallNumber + 1;\nconsole.log(`Call Agendas has ${allRows.length} row(s), max parsed Call N = ${maxCallNumber}, next would be Call ${nextCallNumber}.`);\nconsole.log(`Client name: \"${clientName}\"`);\n\nif (!clientName) {\n  return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty.' } }];\n}\n\nfunction reuseExistingRow(row, grainIdHint, source) {\n  const transcriptUrl = rowTranscriptUrl(row);\n  const existingNum = rowCallNumber(row);\n  const storedGrainId = rowGrainIdText(row) || grainIdHint || '';\n  console.log(`Reusing existing Call Agendas row \"${rowCallTitle(row)}\" via ${source}. Has transcript: ${!!transcriptUrl}.`);\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      agenda_row_id: row.id,\n      transcript_doc_url: transcriptUrl,\n      call_title: rowCallTitle(row) || 'Untitled Call',\n      latest_grain_call_id: storedGrainId,\n      latest_grain_call_date: rowCallDate(row),\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : (existingNum || nextCallNumber),\n      use_existing_transcript: !!transcriptUrl,\n      used_prev_week: false,\n      selection_source: source\n    }\n  }];\n}\n\nfunction emitGrainPick(pick, existing, sourceLabel) {\n  const pickedDate = pickRecordingDate(pick);\n  console.log(`${sourceLabel} pick: id=${pick.id}, title=\"${pick.title || ''}\", date=${pickedDate}, duration_sec=${recordingDurationSec(pick)}`);\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: pick.id,\n      latest_grain_call_title: pick.title || '',\n      latest_grain_call_date: pickedDate,\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : nextCallNumber,\n      existing_agenda_row_id: existing ? existing.id : null,\n      use_existing_transcript: false,\n      used_prev_week: false,\n      selection_source: sourceLabel\n    }\n  }];\n}\n\n// ── Path 1: Specific call requested via Notes for AI or dashboard override ───────\nconst notesGrainId = preprocess.specific_call_ref?.type === 'grain_url' ? preprocess.specific_call_ref.grain_recording_id : null;\nconst dashboardGrainId = contextData.grain_recording_id || '';\nconst overrideRecordingId = notesGrainId || dashboardGrainId;\n\nif (overrideRecordingId) {\n  const existing = findRowByGrainId(overrideRecordingId);\n  if (existing && rowTranscriptUrl(existing)) {\n    return reuseExistingRow(existing, overrideRecordingId, 'notes_override_matched_existing');\n  }\n  const specificRec = allRecordings.find(r => r.id === overrideRecordingId);\n  if (specificRec) {\n    return emitGrainPick(specificRec, existing, 'notes_override');\n  }\n  // Override ID not in the Grain window — emit minimally; downstream will try to fetch transcript directly.\n  return [{ json: { ...contextData, abort: false, client_name: clientName, call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    latest_grain_call_id: overrideRecordingId,\n    latest_grain_call_title: 'Recording ' + overrideRecordingId,\n    latest_grain_call_date: '',\n    new_call_number: callNumberOverride > 0 ? callNumberOverride : nextCallNumber,\n    existing_agenda_row_id: existing ? existing.id : null,\n    use_existing_transcript: false, used_prev_week: false, selection_source: 'notes_override_id_only' } }];\n}\n\n// ── Path 2: Most recent substantive client call ──────────────────────────────────\nif (!primaryEmail && !secondaryEmail) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true, abort_reason: 'No Primary Email or Secondary Email set on ' + clientName + \"'s Notion page.\" } }];\n}\nif (allRecordings.length === 0) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true, abort_reason: 'Grain returned 0 recordings.' } }];\n}\n\nconst targetEmails = [primaryEmail, secondaryEmail].filter(Boolean);\nfunction recordingHasClient(r) {\n  const parts = r.participants || r.participant_list || [];\n  return parts.some(p => {\n    const email = (p?.email || '').toLowerCase().trim();\n    return email && targetEmails.includes(email);\n  });\n}\n\nconst candidateClientCalls = allRecordings.filter(recordingHasClient);\nconst substantiveClientCalls = candidateClientCalls.filter(r => {\n  const d = recordingDurationSec(r);\n  if (d > 0 && d < MIN_DURATION_SEC) {\n    console.log(`Skipping dud call ${r.id} (${r.title || ''}) — duration ${d}s < ${MIN_DURATION_SEC}s.`);\n    return false;\n  }\n  return true;\n});\nconsole.log(`Client calls (with email match): ${candidateClientCalls.length}, after dud filter: ${substantiveClientCalls.length}.`);\n\nif (substantiveClientCalls.length === 0) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No substantive client calls found in Grain for ' + clientName + ' (all candidates were under ' + MIN_DURATION_SEC + 's).' } }];\n}\n\n// Sort descending by date — most recent first.\nconst sortedByDateDesc = [...substantiveClientCalls].sort((a, b) =>\n  new Date(pickRecordingDate(b) || 0) - new Date(pickRecordingDate(a) || 0)\n);\n\n// Pick the most recent one. Then dedup against Call Agendas: if it's there with a transcript, reuse.\nconst pick = sortedByDateDesc[0];\nconst existing = findRowByGrainId(pick.id);\nif (existing && rowTranscriptUrl(existing)) {\n  return reuseExistingRow(existing, pick.id, 'most_recent_matched_existing');\n}\n\nreturn emitGrainPick(pick, existing, 'most_recent');\n"
+        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\nconst primaryEmail   = (contextData.primary_email   || '').toLowerCase().trim();\nconst secondaryEmail = (contextData.secondary_email || '').toLowerCase().trim();\n\nconst allRecordings = (grainRaw?.recordings || []).filter(c => !!c?.id);\nconst notionRows = notionRaw?.results || [];\nconst allRows = notionRows;\n\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\n\nconst MIN_DURATION_SEC = 600;\n\nfunction pickRecordingDate(r) {\n  if (!r) return '';\n  const candidates = [r.start_datetime, r.started_at, r.recorded_at, r.meeting_start_at, r.meeting_started_at, r.record_started_at, r.created_at];\n  for (const c of candidates) {\n    if (c == null || c === '') continue;\n    if (typeof c === 'number') return new Date(c * (c < 1e12 ? 1000 : 1)).toISOString();\n    if (typeof c === 'string') return c;\n  }\n  return '';\n}\nfunction recordingDurationSec(r) {\n  if (typeof r?.duration === 'number') return r.duration;\n  if (typeof r?.duration_seconds === 'number') return r.duration_seconds;\n  const start = pickRecordingDate(r);\n  const end = r?.end_datetime || r?.ended_at || r?.meeting_end_at || '';\n  if (start && end) {\n    const s = new Date(start).getTime();\n    const e = new Date(end).getTime();\n    if (!isNaN(s) && !isNaN(e) && e > s) return Math.round((e - s) / 1000);\n  }\n  return 0;\n}\nfunction rowCallTitle(row) {\n  const props = row?.properties || {};\n  for (const [, v] of Object.entries(props)) {\n    if (v?.type === 'title') {\n      const t = (v.title || []).map(rt => rt?.plain_text || '').join('');\n      if (t) return t;\n    }\n  }\n  return '';\n}\nfunction rowCallNumber(row) {\n  const m = (rowCallTitle(row) || '').match(/Call\\s+(\\d+)/i);\n  return m ? parseInt(m[1], 10) : 0;\n}\nfunction rowCallDate(row) { return row?.properties?.['Call Date']?.date?.start || ''; }\nfunction rowTranscriptUrl(row) {\n  return row?.properties?.['Transcript URL']?.url || row?.properties?.['Transcript Doc']?.url\n    || row?.properties?.['Transcript Link']?.url || row?.properties?.['Transcript']?.url || '';\n}\nfunction rowGrainIdText(row) {\n  return row?.properties?.['Grain Recording ID']?.rich_text?.[0]?.plain_text\n    || row?.properties?.['Grain ID']?.rich_text?.[0]?.plain_text || '';\n}\nfunction rowContainsGrainId(row, grainId) {\n  if (!grainId) return false;\n  for (const [, v] of Object.entries(row?.properties || {})) {\n    if (!v) continue;\n    if (v.type === 'url' && v.url && v.url.includes(grainId)) return true;\n    if (v.type === 'rich_text') { const t = (v.rich_text || []).map(rt => rt?.plain_text || '').join(''); if (t.includes(grainId)) return true; }\n    if (v.type === 'title') { const t = (v.title || []).map(rt => rt?.plain_text || '').join(''); if (t.includes(grainId)) return true; }\n  }\n  return false;\n}\nfunction findRowByGrainId(grainId) {\n  return notionRows.find(r => rowGrainIdText(r) === grainId || rowContainsGrainId(r, grainId));\n}\n\nconst maxCallNumber = allRows.reduce((max, r) => Math.max(max, rowCallNumber(r)), 0);\nconst nextCallNumber = maxCallNumber + 1;\nconsole.log(`Call Agendas has ${allRows.length} row(s), max parsed Call N = ${maxCallNumber}, next would be Call ${nextCallNumber}.`);\n\nif (!clientName) return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty.' } }];\n\nfunction buildFallbackList(allSubstantive, primaryId) {\n  return allSubstantive\n    .filter(r => r.id !== primaryId)\n    .slice(0, 3)\n    .map(r => ({\n      id: r.id,\n      title: r.title || ('Recording ' + r.id),\n      date: pickRecordingDate(r),\n      duration_sec: recordingDurationSec(r)\n    }));\n}\n\nfunction reuseExistingRow(row, grainIdHint, source, fallbackCandidates) {\n  const transcriptUrl = rowTranscriptUrl(row);\n  const existingNum = rowCallNumber(row);\n  const storedGrainId = rowGrainIdText(row) || grainIdHint || '';\n  console.log(`Reusing existing Call Agendas row \"${rowCallTitle(row)}\" via ${source}. Has transcript: ${!!transcriptUrl}. ${fallbackCandidates.length} fallback(s) available.`);\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      agenda_row_id: row.id,\n      transcript_doc_url: transcriptUrl,\n      call_title: rowCallTitle(row) || 'Untitled Call',\n      latest_grain_call_id: storedGrainId,\n      latest_grain_call_date: rowCallDate(row),\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : (existingNum || nextCallNumber),\n      use_existing_transcript: !!transcriptUrl,\n      used_prev_week: false,\n      selection_source: source,\n      fallback_candidates: fallbackCandidates\n    }\n  }];\n}\n\nfunction emitGrainPick(pick, existing, sourceLabel, fallbackCandidates) {\n  const pickedDate = pickRecordingDate(pick);\n  console.log(`${sourceLabel} pick: id=${pick.id}, title=\"${pick.title || ''}\", date=${pickedDate}, duration_sec=${recordingDurationSec(pick)}, ${fallbackCandidates.length} fallback(s).`);\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: pick.id,\n      latest_grain_call_title: pick.title || '',\n      latest_grain_call_date: pickedDate,\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : nextCallNumber,\n      existing_agenda_row_id: existing ? existing.id : null,\n      use_existing_transcript: false,\n      used_prev_week: false,\n      selection_source: sourceLabel,\n      fallback_candidates: fallbackCandidates\n    }\n  }];\n}\n\n// Path 1: Notes override\nconst notesGrainId = preprocess.specific_call_ref?.type === 'grain_url' ? preprocess.specific_call_ref.grain_recording_id : null;\nconst dashboardGrainId = contextData.grain_recording_id || '';\nconst overrideRecordingId = notesGrainId || dashboardGrainId;\n\nif (overrideRecordingId) {\n  // For explicit override, no fallbacks — the user picked this specific call.\n  const existing = findRowByGrainId(overrideRecordingId);\n  if (existing && rowTranscriptUrl(existing)) return reuseExistingRow(existing, overrideRecordingId, 'notes_override_matched_existing', []);\n  const specificRec = allRecordings.find(r => r.id === overrideRecordingId);\n  if (specificRec) return emitGrainPick(specificRec, existing, 'notes_override', []);\n  return [{ json: { ...contextData, abort: false, client_name: clientName, call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    latest_grain_call_id: overrideRecordingId, latest_grain_call_title: 'Recording ' + overrideRecordingId, latest_grain_call_date: '',\n    new_call_number: callNumberOverride > 0 ? callNumberOverride : nextCallNumber,\n    existing_agenda_row_id: existing ? existing.id : null,\n    use_existing_transcript: false, used_prev_week: false, selection_source: 'notes_override_id_only',\n    fallback_candidates: [] } }];\n}\n\n// Path 2: Most recent substantive client call\nif (!primaryEmail && !secondaryEmail) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true, abort_reason: 'No Primary Email or Secondary Email set on ' + clientName + \"'s Notion page.\" } }];\n}\nif (allRecordings.length === 0) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true, abort_reason: 'Grain returned 0 recordings.' } }];\n}\n\nconst targetEmails = [primaryEmail, secondaryEmail].filter(Boolean);\nfunction recordingHasClient(r) {\n  const parts = r.participants || r.participant_list || [];\n  return parts.some(p => { const email = (p?.email || '').toLowerCase().trim(); return email && targetEmails.includes(email); });\n}\n\nconst candidateClientCalls = allRecordings.filter(recordingHasClient);\nconst substantiveClientCalls = candidateClientCalls.filter(r => {\n  const d = recordingDurationSec(r);\n  if (d > 0 && d < MIN_DURATION_SEC) {\n    console.log(`Skipping dud call ${r.id} (${r.title || ''}) — duration ${d}s < ${MIN_DURATION_SEC}s.`);\n    return false;\n  }\n  return true;\n});\nconsole.log(`Client calls (email match): ${candidateClientCalls.length}, after dud filter: ${substantiveClientCalls.length}.`);\n\nif (substantiveClientCalls.length === 0) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No substantive client calls found in Grain for ' + clientName + ' (all under ' + MIN_DURATION_SEC + 's).' } }];\n}\n\nconst sortedByDateDesc = [...substantiveClientCalls].sort((a, b) =>\n  new Date(pickRecordingDate(b) || 0) - new Date(pickRecordingDate(a) || 0)\n);\n\nconst pick = sortedByDateDesc[0];\nconst fallbacks = buildFallbackList(sortedByDateDesc, pick.id);\nconst existing = findRowByGrainId(pick.id);\nif (existing && rowTranscriptUrl(existing)) return reuseExistingRow(existing, pick.id, 'most_recent_matched_existing', fallbacks);\nreturn emitGrainPick(pick, existing, 'most_recent', fallbacks);\n"
       },
       "id": "e955718b-03b3-434d-89a5-4dd34ba599c4",
       "name": "Cross-check Dates and Determine Call Number",
@@ -727,7 +727,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Prepare Mine Ideas Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const emptyMatch = text.match(/\\[\\s*\\]/);\n  if (emptyMatch) { try { return JSON.parse(emptyMatch[0]); } catch (_) {} }\n  const start = text.indexOf('[');\n  if (start === -1) return null;\n  const lastClose = text.lastIndexOf('}');\n  if (lastClose <= start) return null;\n  try { const p = JSON.parse(text.slice(start, lastClose + 1) + ']'); if (Array.isArray(p)) return p; } catch (e) {\n    const prev = text.lastIndexOf('}', lastClose - 1);\n    if (prev > start) { try { const p2 = JSON.parse(text.slice(start, prev + 1) + ']'); if (Array.isArray(p2)) return p2; } catch (_) {} }\n  }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (ideas === null) {\n  throw new Error('Failed to parse ideas from Claude (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\n}\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  // Empty result from a substantive call is a genuine failure — let it propagate so the error workflow handles it.\n  throw new Error('Claude returned 0 ideas from the transcript (stop_reason=' + stopReason + '). Call was likely off-topic or too brief despite passing the duration filter. Review the transcript.');\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames } }];\n"
+        "jsCode": "const ctx = $('Prepare Mine Ideas Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const emptyMatch = text.match(/\\[\\s*\\]/);\n  if (emptyMatch) { try { return JSON.parse(emptyMatch[0]); } catch (_) {} }\n  const start = text.indexOf('[');\n  if (start === -1) return null;\n  const lastClose = text.lastIndexOf('}');\n  if (lastClose <= start) return null;\n  try { const p = JSON.parse(text.slice(start, lastClose + 1) + ']'); if (Array.isArray(p)) return p; } catch (e) {\n    const prev = text.lastIndexOf('}', lastClose - 1);\n    if (prev > start) { try { const p2 = JSON.parse(text.slice(start, prev + 1) + ']'); if (Array.isArray(p2)) return p2; } catch (_) {} }\n  }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (ideas === null) {\n  throw new Error('Failed to parse ideas from Claude (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\n}\n\n// Empty case is no longer a hard error here — it routes to the fallback chain via IF Mine Ideas Empty.\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  console.log('Claude returned 0 ideas — routing to one-shot fallback chain.');\n  return [{ json: { ...ctx, is_empty: true, raw_ideas: [], format_names_needed: [], claude_stop_reason: stopReason } }];\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nreturn [{ json: { ...ctx, is_empty: false, raw_ideas: ideas, format_names_needed: allFormatNames } }];\n"
       },
       "id": "8a2b1d7c-318c-451f-a98b-ea44feeacd95",
       "name": "Parse Ideas and Extract Format Names",
@@ -2238,6 +2238,159 @@
       "parameters": {
         "jsCode": "// After the doc has been overwritten, package the data in the same shape that\n// Extract Transcript Text would have emitted on the happy path. This lets the\n// downstream Query Format Bank Pass 1 (and all references to Extract Transcript Text)\n// work without knowing we took the recovery branch.\nconst prev = $('Build Doc Overwrite Body').first().json;\nconsole.log(`Refreshed transcript ready: ${(prev.transcript_text || '').length} chars.`);\nreturn [{\n  json: {\n    ...prev,\n    transcript_text: prev.transcript_text,\n    transcript_is_placeholder: false,\n    recovered_from_placeholder: true\n  }\n}];\n"
       }
+    },
+    {
+      "id": "fallback-mine-0001-4000-8000-000000000001",
+      "name": "IF Mine Ideas Empty",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        180164,
+        44784
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is_empty_true",
+              "leftValue": "={{ $json.is_empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fallback-mine-0001-4000-8000-000000000002",
+      "name": "Pick Fallback Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180384,
+        45034
+      ],
+      "parameters": {
+        "jsCode": "// Pick the first fallback candidate (next-most-recent substantive call).\n// If no fallbacks were prepared (e.g., notes override), throw — there's nothing to retry with.\nconst ctx = $input.first().json;\nconst fallbacks = ctx.fallback_candidates || [];\nif (fallbacks.length === 0) {\n  throw new Error('No fallback candidates available. The primary call yielded 0 ideas and there is no alternative call to try. (Notes override paths bypass fallback by design.)');\n}\nconst next = fallbacks[0];\nconsole.log(`Fallback call: id=${next.id}, title=\"${next.title}\", date=${next.date}, duration_sec=${next.duration_sec}.`);\nreturn [{\n  json: {\n    ...ctx,\n    is_empty: false,\n    fallback_grain_call_id: next.id,\n    fallback_call_title: next.title,\n    fallback_call_date: next.date\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "fallback-mine-0001-4000-8000-000000000003",
+      "name": "Fetch Fallback Grain Transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        180604,
+        45034
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.grain.com/_/public-api/v2/recordings/' + $json.fallback_grain_call_id + '/transcript.txt' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Public-Api-Version",
+              "value": "2025-10-31"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2xe5Fu89Y7JRKtxW",
+          "name": "Grain API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "fallback-mine-0001-4000-8000-000000000004",
+      "name": "Build Fallback Mine Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180824,
+        45034
+      ],
+      "parameters": {
+        "jsCode": "// Take the freshly-fetched fallback transcript and produce the same shape Prepare Mine Ideas Context emits,\n// so Mine Ideas Claude (Fallback) can call Anthropic with the same user prompt structure.\nconst pick = $('Pick Fallback Call').first().json;\nconst refetch = $input.first().json;\nconst fetchFailed = !!refetch?.error || !!refetch?.code;\nconst transcript = fetchFailed ? '' : (refetch?.data || '').trim();\n\nif (!transcript) {\n  throw new Error('Fallback Grain transcript fetch returned empty for recording ' + pick.fallback_grain_call_id + '. No more retries available.');\n}\n\nconst formatList = pick.format_list || [];\n\nconst userPrompt = `CLIENT: ${pick.client_name}\\n\\nINTELLIGENCE BRIEF:\\n${pick.intel_brief_text}\\n\\nCONTENT STRATEGY (${pick.total_posts_per_batch} posts/batch - LinkedIn: ${pick.linkedin_posts}, X/Twitter: ${pick.x_posts}):\\n${pick.strategy_doc_text}\\n\\nWRITER'S NOTES FOR THIS BATCH:\\n${pick.notes_for_ai || 'None'}\\n\\nCALL: ${pick.fallback_call_title || 'Fallback call'} (FALLBACK — primary call yielded no ideas)\\n\\nFULL TRANSCRIPT:\\n${transcript}\\n\\n---\\nFORMAT BANK (name | description | when to use | platform):\\n${formatList.map(f => `- ${f.name} | ${f.description} | ${f.when_to_use} | ${f.platform}`).join('\\n')}\\n\\n---\\nTARGET: Generate ${pick.transcript_idea_quota} ideas.\\n\\nIMPORTANT: This is the fallback attempt because the most recent call did not produce ideas. Mine this transcript thoroughly. Returning zero is reserved for transcripts that are literally empty, garbled, or unrelated to the client's business.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. Each element:\\n{\\n  \"topic\": \"one word, two words, or one line\",\\n  \"one_of_one_opinion\": \"the unique take only this client can have\",\\n  \"content_pillar\": \"exact pillar name from the strategy doc\",\\n  \"transcript_source\": \"direct quote or clear description of the specific moment this came from\",\\n  \"format_candidates\": [\"Format Name 1\", \"Format Name 2\", \"Format Name 3\"],\\n  \"platform_lean\": \"LinkedIn or X/Twitter or Either\",\\n  \"notes_for_reviewer\": \"flags or questions for the human reviewer, empty string if none\"\\n}`;\n\nconsole.log(`Fallback transcript fetched (${transcript.length} chars). Ready for Mine Ideas (Fallback).`);\nreturn [{ json: {\n  ...pick,\n  transcript_text: transcript,\n  mine_ideas_user_prompt: userPrompt,\n  used_fallback: true\n} }];\n"
+      }
+    },
+    {
+      "id": "fallback-mine-0001-4000-8000-000000000005",
+      "name": "Mine Ideas Claude (Fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        181044,
+        45034
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 16000, system: 'You are an expert content strategist specializing in extracting high-quality social media content ideas from client call transcripts. Your role is to mine transcripts for one-of-one content ideas - moments, stories, and opinions that only this specific client can authentically share.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC - one word, two words, or one line\\n2. FORMAT - a format from the Format Bank\\n3. 1-OF-1 OPINION - the unique take only this client can have\\n\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—, U+2014) anywhere. Not in topics, opinions, sources, notes - anywhere. If you would naturally use one, rewrite with a comma, semicolon, or period.\\n- Also avoid en dashes (–, U+2013). A standard hyphen (-) is fine only when a hyphen is genuinely needed (e.g. \"one-of-one\", \"365-day\").\\n\\nWHO IS SPEAKING:\\nThe transcript has multiple speakers. Distinguish the CLIENT from the agency/strategist/team. 1-of-1 ideas should come from the client\\'s voice, opinions, experiences, and stories. If a strategist suggests a direction and the client picks it up and expresses an actual opinion, that\\'s fair game.\\n\\nCALL CONTEXT:\\nSome calls are pure new-ideation; many calls also include review of pre-built ideas or reflection on past performance. Mine the new material; for content that is clearly already in the pipeline (\"here is the post we wrote about X\", \"this is the draft we sent\"), don\\'t double-count by re-mining the same idea. But: if a reflection or review produces a NEW angle, opinion, or follow-up the client explicitly wants to explore, that new extension IS mineable.\\n\\nPREVIOUS BATCH (if provided):\\nYou will be given a list of ideas from the most recent prior batch with their status (For Review / Approved / Scheduled / Posted / Needs Improvement / Scratch). Treat this as helpful context: avoid producing a near-duplicate of an Approved/Scheduled/Posted idea, and avoid repeating angles that were Scratched. But this is informational - if the call surfaces a related-but-distinct angle, mine it. Do not let prior-batch overlap drive you to produce zero ideas.\\n\\nQUALITY GOAL - each idea should:\\n1. Have a clear topic\\n2. Have a format candidate from the Format Bank\\n3. Carry a real 1-of-1 opinion from this client\\n4. Connect to a content pillar from the strategy doc\\n5. Pass the 365-day test: a brand built on this content style is stronger for it\\n\\nMINING APPROACH:\\n- Mine for specific stories, strong opinions, unique experiences, numbers, turning points\\n- Approve/reject signals: if the client seemed clearly disinterested in a direction, skip it\\n- ONE golden nugget per idea. Don\\'t merge two separate insights\\n- Preserve the original thought - do not over-synthesize\\n- ICP relevance: ideas should serve the audience\\n\\nCONTENT PILLAR RULES:\\n- Every idea ties to a content pillar listed in the strategy\\n- Miscellaneous is allowed only if the strategy explicitly defines it, and used sparingly\\n\\nANTI-HALLUCINATION:\\n- Every idea must be traceable to a real, specific moment in the transcript\\n- Don\\'t invent conclusions the client did not state\\n- Don\\'t combine two separate thoughts into one\\n\\nVOLUME EXPECTATION:\\nThe user gives you a target idea quota. Aim to hit it. If a call is genuinely lean, return fewer rather than fabricating - but do not return zero unless the transcript has truly no usable moments. Be productive, not paranoid.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown.', messages: [{ role: 'user', content: $json.mine_ideas_user_prompt }] }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4T8Kci2Im6elVzo2",
+          "name": "Anthropic API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000
+    },
+    {
+      "id": "fallback-mine-0001-4000-8000-000000000006",
+      "name": "Parse Ideas (Fallback)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        181264,
+        45034
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('Build Fallback Mine Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const emptyMatch = text.match(/\\[\\s*\\]/);\n  if (emptyMatch) { try { return JSON.parse(emptyMatch[0]); } catch (_) {} }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (ideas === null) throw new Error('Fallback Mine: failed to parse Claude response (stop_reason=' + stopReason + '). Response: ' + content.substring(0, 800));\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  throw new Error('Fallback Mine also returned 0 ideas. Both the most recent call and the next-most-recent call yielded no mineable content for ' + (ctx.client_name || 'this client') + '. Manually pick a Grain URL via Notes for AI and re-submit.');\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nconsole.log(`Fallback Mine succeeded with ${ideas.length} idea(s).`);\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames, is_empty: false } }];\n"
+      }
     }
   ],
   "pinData": {},
@@ -2582,7 +2735,7 @@
       "main": [
         [
           {
-            "node": "Query Format Bank Pass 2 Examples",
+            "node": "IF Mine Ideas Empty",
             "type": "main",
             "index": 0
           }
@@ -3256,6 +3409,79 @@
         [
           {
             "node": "Query Format Bank Pass 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Mine Ideas Empty": {
+      "main": [
+        [
+          {
+            "node": "Pick Fallback Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Query Format Bank Pass 2 Examples",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Fallback Call": {
+      "main": [
+        [
+          {
+            "node": "Fetch Fallback Grain Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Fallback Grain Transcript": {
+      "main": [
+        [
+          {
+            "node": "Build Fallback Mine Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Fallback Mine Context": {
+      "main": [
+        [
+          {
+            "node": "Mine Ideas Claude (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mine Ideas Claude (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Parse Ideas (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Ideas (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Query Format Bank Pass 2 Examples",
             "type": "main",
             "index": 0
           }
