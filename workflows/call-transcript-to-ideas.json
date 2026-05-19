@@ -957,7 +957,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $(\"Create Batch Page\").first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Content Lineup' } }], properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'purple' }, { name: 'Needs Improvement', color: 'yellow' }, { name: 'Scratch', color: 'red' }, { name: 'Approved', color: 'green' }, { name: 'Scheduled', color: 'blue' }, { name: 'Posted', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, 'Content Pillar': { rich_text: {} }, Topic: { rich_text: {} }, Format: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
+        "jsonBody": "={{ JSON.stringify($json.create_db_body) }}",
         "options": {}
       },
       "id": "6b93c445-24ea-4380-9e21-f9dded95382b",
@@ -1719,7 +1719,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'purple' }, { name: 'Needs Improvement', color: 'yellow' }, { name: 'Scratch', color: 'red' }, { name: 'Approved', color: 'green' }, { name: 'Scheduled', color: 'blue' }, { name: 'Posted', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, 'Content Pillar': { rich_text: {} }, Topic: { rich_text: {} }, Format: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
+        "jsonBody": "={{ JSON.stringify({ properties: $('Build Content Lineup DB Body').first().json.create_db_body.properties }) }}",
         "options": {}
       },
       "id": "aff731f8-01e1-4738-80aa-5e34ba2c4856",
@@ -2393,49 +2393,47 @@
       }
     },
     {
-      "id": "enrich-date-0001-4000-8000-000000000001",
-      "name": "Fetch Grain Recording Metadata",
+      "id": "template-schema-0001-4000-8000-000000000001",
+      "name": "Fetch Content Lineup Template Schema",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        175044,
-        44768
+        182064,
+        45344
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.grain.com/_/public-api/v2/recordings/' + $json.latest_grain_call_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "url": "https://api.notion.com/v1/databases/3656c2b131cf801f9bc6d4b69b84f147",
+        "authentication": "predefinedCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
-              "name": "Public-Api-Version",
-              "value": "2025-10-31"
+              "name": "Notion-Version",
+              "value": "2022-06-28"
             }
           ]
         },
-        "options": {}
+        "nodeCredentialType": "notionApi"
       },
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "2xe5Fu89Y7JRKtxW",
-          "name": "Grain API"
+        "notionApi": {
+          "id": "oyQgOUsxQsxmUvK8",
+          "name": "Notion (via API)"
         }
-      },
-      "continueOnFail": true
+      }
     },
     {
-      "id": "enrich-date-0001-4000-8000-000000000002",
-      "name": "Enrich Call Date",
+      "id": "template-schema-0001-4000-8000-000000000002",
+      "name": "Build Content Lineup DB Body",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        175264,
-        44768
+        182304,
+        45344
       ],
       "parameters": {
-        "jsCode": "// Some override paths (notes_override_id_only) leave latest_grain_call_date empty because the\n// recording wasn't returned by the bulk Grain listing — even though the transcript fetch works.\n// We fetch the recording's metadata directly so the Call Date column always gets populated.\nconst crosscheck = $('Cross-check Dates and Determine Call Number').first().json;\nconst metaResp = $input.first().json;\nconst metaFailed = !!metaResp?.error || !!metaResp?.code;\n\nif (crosscheck.latest_grain_call_date) {\n  return [{ json: crosscheck }];\n}\n\nif (metaFailed || !metaResp) {\n  console.log('Recording metadata fetch did not return data. Call Date will remain blank.');\n  return [{ json: crosscheck }];\n}\n\nconst candidates = [\n  metaResp.start_datetime, metaResp.started_at, metaResp.recorded_at,\n  metaResp.meeting_start_at, metaResp.meeting_started_at, metaResp.record_started_at,\n  metaResp.created_at\n];\nlet resolved = '';\nfor (const c of candidates) {\n  if (c == null || c === '') continue;\n  if (typeof c === 'number') { resolved = new Date(c * (c < 1e12 ? 1000 : 1)).toISOString(); break; }\n  if (typeof c === 'string') { resolved = c; break; }\n}\n\nif (resolved) {\n  console.log(`Enriched latest_grain_call_date from recording metadata: ${resolved}`);\n  return [{ json: { ...crosscheck, latest_grain_call_date: resolved } }];\n}\n\nconsole.log('Recording metadata had no usable date fields. Call Date will remain blank.');\nreturn [{ json: crosscheck }];\n"
+        "jsCode": "// Mirror the schema from the user-controlled Content Lineup template DB.\n// User edits the template to change columns, options, colors — every future batch matches it.\nconst schemaResp = $('Fetch Content Lineup Template Schema').first().json;\nconst props = schemaResp.properties || {};\nconst batchPageId = $('Create Batch Page').first().json.id;\n\nfunction mirrorProperty(name, prop) {\n  const t = prop.type;\n  switch (t) {\n    case 'title':       return { title: {} };\n    case 'rich_text':   return { rich_text: {} };\n    case 'select':\n      return { select: { options: (prop.select?.options || []).map(o => ({ name: o.name, color: o.color })) } };\n    case 'multi_select':\n      return { multi_select: { options: (prop.multi_select?.options || []).map(o => ({ name: o.name, color: o.color })) } };\n    case 'status':\n      // Notion API cannot set status property options on creation — it uses workspace defaults.\n      // Use select instead if you need custom statuses (we already do for \"Status\" in older templates).\n      return { status: {} };\n    case 'date':           return { date: {} };\n    case 'number':         return { number: { format: prop.number?.format || 'number' } };\n    case 'checkbox':       return { checkbox: {} };\n    case 'url':            return { url: {} };\n    case 'email':          return { email: {} };\n    case 'phone_number':   return { phone_number: {} };\n    case 'people':         return { people: {} };\n    case 'files':          return { files: {} };\n    case 'created_time':\n    case 'last_edited_time':\n    case 'created_by':\n    case 'last_edited_by':\n    case 'relation':\n    case 'rollup':\n    case 'formula':\n    case 'unique_id':\n      // Auto-managed, relational, or computed — skip for inline-DB clones.\n      console.log(`Skipping property \"${name}\" (type=${t}) — not safely cloneable on inline DB.`);\n      return null;\n    default:\n      console.log(`Unknown property type for \"${name}\": ${t} — skipping.`);\n      return null;\n  }\n}\n\nconst newProps = {};\nconst order = [];\nfor (const [name, prop] of Object.entries(props)) {\n  const mirrored = mirrorProperty(name, prop);\n  if (mirrored) {\n    newProps[name] = mirrored;\n    order.push(name);\n  }\n}\n\nconst body = {\n  parent: { type: 'page_id', page_id: batchPageId },\n  is_inline: true,\n  title: [{ type: 'text', text: { content: 'Content Lineup' } }],\n  properties: newProps\n};\n\nconsole.log(`Mirrored ${order.length} properties from template \"${schemaResp.title?.[0]?.plain_text || schemaResp.id}\" in order: ${order.join(' | ')}`);\nreturn [{ json: { create_db_body: body, mirrored_property_names: order } }];\n"
       }
     }
   ],
@@ -2554,7 +2552,7 @@
       "main": [
         [
           {
-            "node": "Fetch Grain Recording Metadata",
+            "node": "IF Transcript Client Match",
             "type": "main",
             "index": 0
           }
@@ -3154,7 +3152,7 @@
         ],
         [
           {
-            "node": "Create Post Lineup Overview DB",
+            "node": "Fetch Content Lineup Template Schema",
             "type": "main",
             "index": 0
           }
@@ -3534,22 +3532,22 @@
         ]
       ]
     },
-    "Fetch Grain Recording Metadata": {
+    "Fetch Content Lineup Template Schema": {
       "main": [
         [
           {
-            "node": "Enrich Call Date",
+            "node": "Build Content Lineup DB Body",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Enrich Call Date": {
+    "Build Content Lineup DB Body": {
       "main": [
         [
           {
-            "node": "IF Transcript Client Match",
+            "node": "Create Post Lineup Overview DB",
             "type": "main",
             "index": 0
           }
