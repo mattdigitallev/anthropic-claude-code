@@ -25,7 +25,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -89,7 +89,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -120,7 +120,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -226,7 +226,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -410,7 +410,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -531,7 +531,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -642,7 +642,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -749,7 +749,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -856,7 +856,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -908,7 +908,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -947,7 +947,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -1012,7 +1012,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -1144,7 +1144,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1175,7 +1175,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1206,7 +1206,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1237,7 +1237,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1268,7 +1268,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1576,7 +1576,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1701,7 +1701,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Create Post Lineup Overview DB').first().json.id }}",
+        "url": "={{ 'https://api.notion.com/v1/data_sources/' + $('Create Post Lineup Overview DB').first().json.data_sources[0].id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "notionApi",
         "sendHeaders": true,
@@ -1709,7 +1709,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -1768,7 +1768,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1799,7 +1799,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1843,7 +1843,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1887,7 +1887,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -1931,7 +1931,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -1983,7 +1983,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
@@ -2028,7 +2028,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             },
             {
               "name": "Content-Type",
@@ -2410,7 +2410,7 @@
           "parameters": [
             {
               "name": "Notion-Version",
-              "value": "2022-06-28"
+              "value": "2025-09-03"
             }
           ]
         },
