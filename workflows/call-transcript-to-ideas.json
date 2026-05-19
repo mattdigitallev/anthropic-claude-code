@@ -957,7 +957,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.create_db_body) }}",
+        "jsonBody": "={{ JSON.stringify({ parent: { type: 'page_id', page_id: $(\"Create Batch Page\").first().json.id }, is_inline: true, title: [{ type: 'text', text: { content: 'Content Lineup' } }], properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'purple' }, { name: 'Needs Improvement', color: 'yellow' }, { name: 'Scratch', color: 'red' }, { name: 'Approved', color: 'green' }, { name: 'Scheduled', color: 'blue' }, { name: 'Posted', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, 'Content Pillar': { rich_text: {} }, Topic: { rich_text: {} }, Format: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
         "options": {}
       },
       "id": "6b93c445-24ea-4380-9e21-f9dded95382b",
@@ -1719,7 +1719,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ properties: $('Build Content Lineup DB Body').first().json.create_db_body.properties }) }}",
+        "jsonBody": "={{ JSON.stringify({ properties: { Idea: { title: {} }, Status: { select: { options: [{ name: 'For Review', color: 'purple' }, { name: 'Needs Improvement', color: 'yellow' }, { name: 'Scratch', color: 'red' }, { name: 'Approved', color: 'green' }, { name: 'Scheduled', color: 'blue' }, { name: 'Posted', color: 'gray' }] } }, Platform: { select: { options: [{ name: 'LinkedIn', color: 'blue' }, { name: 'X/Twitter', color: 'pink' }] } }, 'Content Pillar': { rich_text: {} }, Topic: { rich_text: {} }, Format: { rich_text: {} }, Sources: { rich_text: {} }, Notes: { rich_text: {} }, 'Posting Date & Time': { date: {} } } }) }}",
         "options": {}
       },
       "id": "aff731f8-01e1-4738-80aa-5e34ba2c4856",
@@ -2390,50 +2390,6 @@
       ],
       "parameters": {
         "jsCode": "const ctx = $('Build Fallback Mine Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const emptyMatch = text.match(/\\[\\s*\\]/);\n  if (emptyMatch) { try { return JSON.parse(emptyMatch[0]); } catch (_) {} }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (ideas === null) throw new Error('Fallback Mine: failed to parse Claude response (stop_reason=' + stopReason + '). Response: ' + content.substring(0, 800));\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  throw new Error('Fallback Mine also returned 0 ideas. Both the most recent call and the next-most-recent call yielded no mineable content for ' + (ctx.client_name || 'this client') + '. Manually pick a Grain URL via Notes for AI and re-submit.');\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nconsole.log(`Fallback Mine succeeded with ${ideas.length} idea(s).`);\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames, is_empty: false } }];\n"
-      }
-    },
-    {
-      "id": "template-schema-0001-4000-8000-000000000001",
-      "name": "Fetch Content Lineup Template Schema",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        182064,
-        45344
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "https://api.notion.com/v1/databases/3656c2b131cf801f9bc6d4b69b84f147",
-        "authentication": "predefinedCredentialType",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2025-09-03"
-            }
-          ]
-        },
-        "nodeCredentialType": "notionApi"
-      },
-      "credentials": {
-        "notionApi": {
-          "id": "oyQgOUsxQsxmUvK8",
-          "name": "Notion (via API)"
-        }
-      }
-    },
-    {
-      "id": "template-schema-0001-4000-8000-000000000002",
-      "name": "Build Content Lineup DB Body",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        182304,
-        45344
-      ],
-      "parameters": {
-        "jsCode": "// Mirror the schema from the user-controlled Content Lineup template DB.\n// User edits the template to change columns, options, colors — every future batch matches it.\nconst schemaResp = $('Fetch Content Lineup Template Schema').first().json;\nconst props = schemaResp.properties || {};\nconst batchPageId = $('Create Batch Page').first().json.id;\n\nfunction mirrorProperty(name, prop) {\n  const t = prop.type;\n  switch (t) {\n    case 'title':       return { title: {} };\n    case 'rich_text':   return { rich_text: {} };\n    case 'select':\n      return { select: { options: (prop.select?.options || []).map(o => ({ name: o.name, color: o.color })) } };\n    case 'multi_select':\n      return { multi_select: { options: (prop.multi_select?.options || []).map(o => ({ name: o.name, color: o.color })) } };\n    case 'status':\n      // Notion API cannot set status property options on creation — it uses workspace defaults.\n      // Use select instead if you need custom statuses (we already do for \"Status\" in older templates).\n      return { status: {} };\n    case 'date':           return { date: {} };\n    case 'number':         return { number: { format: prop.number?.format || 'number' } };\n    case 'checkbox':       return { checkbox: {} };\n    case 'url':            return { url: {} };\n    case 'email':          return { email: {} };\n    case 'phone_number':   return { phone_number: {} };\n    case 'people':         return { people: {} };\n    case 'files':          return { files: {} };\n    case 'created_time':\n    case 'last_edited_time':\n    case 'created_by':\n    case 'last_edited_by':\n    case 'relation':\n    case 'rollup':\n    case 'formula':\n    case 'unique_id':\n      // Auto-managed, relational, or computed — skip for inline-DB clones.\n      console.log(`Skipping property \"${name}\" (type=${t}) — not safely cloneable on inline DB.`);\n      return null;\n    default:\n      console.log(`Unknown property type for \"${name}\": ${t} — skipping.`);\n      return null;\n  }\n}\n\nconst newProps = {};\nconst order = [];\nfor (const [name, prop] of Object.entries(props)) {\n  const mirrored = mirrorProperty(name, prop);\n  if (mirrored) {\n    newProps[name] = mirrored;\n    order.push(name);\n  }\n}\n\nconst body = {\n  parent: { type: 'page_id', page_id: batchPageId },\n  is_inline: true,\n  title: [{ type: 'text', text: { content: 'Content Lineup' } }],\n  properties: newProps\n};\n\nconsole.log(`Mirrored ${order.length} properties from template \"${schemaResp.title?.[0]?.plain_text || schemaResp.id}\" in order: ${order.join(' | ')}`);\nreturn [{ json: { create_db_body: body, mirrored_property_names: order } }];\n"
       }
     }
   ],
@@ -3152,7 +3108,7 @@
         ],
         [
           {
-            "node": "Fetch Content Lineup Template Schema",
+            "node": "Create Post Lineup Overview DB",
             "type": "main",
             "index": 0
           }
@@ -3526,28 +3482,6 @@
         [
           {
             "node": "Query Format Bank Pass 2 Examples",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Content Lineup Template Schema": {
-      "main": [
-        [
-          {
-            "node": "Build Content Lineup DB Body",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Content Lineup DB Body": {
-      "main": [
-        [
-          {
-            "node": "Create Post Lineup Overview DB",
             "type": "main",
             "index": 0
           }
