@@ -716,14 +716,16 @@
         44784
       ],
       "retryOnFail": true,
-      "maxTries": 10,
-      "waitBetweenTries": 30000,
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "4T8Kci2Im6elVzo2",
           "name": "Anthropic API Key"
         }
-      }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -823,14 +825,16 @@
         44784
       ],
       "retryOnFail": true,
-      "maxTries": 10,
-      "waitBetweenTries": 30000,
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "4T8Kci2Im6elVzo2",
           "name": "Anthropic API Key"
         }
-      }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -2376,8 +2380,10 @@
         }
       },
       "retryOnFail": true,
-      "maxTries": 10,
-      "waitBetweenTries": 30000
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "id": "fallback-mine-0001-4000-8000-000000000006",
@@ -2481,8 +2487,10 @@
         }
       },
       "retryOnFail": true,
-      "maxTries": 10,
-      "waitBetweenTries": 30000
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "id": "hooks-chain-0001-4000-8000-000000000004",
@@ -2496,6 +2504,304 @@
       "parameters": {
         "jsCode": "const ctx = $('Prepare Hooks Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseHooks(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  return null;\n}\n\nlet hooks = parseHooks(content);\nif (!Array.isArray(hooks)) {\n  throw new Error('Failed to parse hooks (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\n}\nhooks = deepStripDashes(hooks);\n\n// Merge hooks back into each final_ideas entry by idea_index (fall back to order)\nconst ideas = (ctx.final_ideas || []).map((idea, idx) => {\n  const entry = hooks.find(h => h.idea_index === idx) || hooks[idx] || {};\n  const ideaHooks = entry.hooks || [];\n  return {\n    ...idea,\n    hook1: ideaHooks[0] || '',\n    hook2: ideaHooks[1] || '',\n    hook3: ideaHooks[2] || ''\n  };\n});\n\nconst withAtLeastOneHook = ideas.filter(i => i.hook1 || i.hook2 || i.hook3).length;\nconsole.log(`Parsed hooks for ${withAtLeastOneHook}/${ideas.length} ideas (stop_reason=${stopReason}).`);\n\nreturn [{ json: { ...ctx, final_ideas: ideas } }];\n"
       }
+    },
+    {
+      "id": "fallback-claude-2dcda04fbc3243f2a2d6c784",
+      "name": "IF Mine Ideas Claude OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        179892,
+        44784
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "primary_has_content",
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-6', max_tokens: 16000, system: 'You are an expert content strategist mining one-of-one content ideas from a client call transcript. The output goes straight to a writer + the client - it should read like notes a thoughtful strategist took for them.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC - one word, two words, or one line\\n2. FORMAT - a format from the Format Bank\\n3. 1-OF-1 OPINION - the unique take only this client can have\\n\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—) or en dashes (–). Use comma, semicolon, period, hyphen, or rewrite.\\n\\nWHO IS SPEAKING:\\nDistinguish the CLIENT from the agency/strategist/team. 1-of-1 ideas come from the client\\'s voice. If a strategist suggests a direction and the client picks it up with their own opinion, fair game.\\n\\nWHAT TO MINE vs WHAT TO SKIP (CRITICAL):\\nEvery moment in the transcript falls into one of three buckets. Apply this classification carefully BEFORE deciding to mine anything.\\n\\n(A) IRRELEVANT - DO NOT MINE.\\nIncludes:\\n- Small talk, pleasantries, scheduling, logistics\\n- Operational arrangements between client and agency (\"let\\'s do Monday 9am kickoffs\", \"I\\'ll send the doc Friday\", \"let\\'s record next week\")\\n- Internal process notes (recording cadence, who hands off what, when reviews happen)\\n- Discussion of meta-workflow (\"makes it feel less heavy\", \"this is going to be smoother\")\\n- Any conversation about the agency-client relationship, billing, deliverables process\\nThese produce ZERO ideas. Logistics is never an idea. If a moment is about HOW the work gets done, not the substance of what to post about, skip it entirely.\\n\\n(B) ALREADY-DISCUSSED IDEAS - DO NOT MINE.\\nThe strategist may be presenting pre-built ideas, asking the client for input on drafts, or walking through what\\'s in the existing pipeline. Examples:\\n- \"Here is the post we wrote about X\"\\n- \"We\\'re thinking of a carousel on Y, thoughts?\"\\n- \"This is the draft we sent over\"\\n- \"In the last batch, we had...\"\\nThe strategist is gathering context for content that already exists. DO NOT mine these as new ideas. The idea is already in the pipeline.\\n\\nNUANCE: If the client takes an already-discussed idea and pushes it forward with a NEW angle, opinion, or follow-up they explicitly want to add, the NET-NEW extension IS mineable. But only the net-new piece - not the original idea.\\n\\n(C) FRESH SUBSTANCE - MINE THIS.\\nThis is what you\\'re looking for. Real material:\\n- Fresh stories the client tells\\n- Strong opinions the client expresses on a topic\\n- Unique experiences, numbers, turning points\\n- Reactions to current events / industry news the client cares about\\n- Beliefs the client has that go against the grain\\n- Specific moments where the client teaches something\\nIf a moment passes the test \"would the client\\'s audience find this valuable on its own as a post?\", it\\'s bucket C.\\n\\nWHEN UNSURE: lean toward skipping. False positives (mining logistics or already-discussed ideas) waste a slot and embarrass the agency. A leaner batch of real ideas is always better than a padded one.\\n\\nPREVIOUS BATCH (if provided):\\nAvoid near-duplicates of Approved/Scheduled/Posted ideas. Avoid Scratched angles. Informational - if the call surfaces a related-but-distinct angle, mine it.\\n\\nCADENCE-AWARE IDEATION (STRICT - hit these exact counts):\\nThe user prompt gives you a TARGET DISTRIBUTION. You MUST aim to hit each bucket precisely. The total = effective_quota.\\n- shared: ideas whose Format is labeled \"LinkedIn & X/Twitter\" in the Format Bank. Aim for the exact shared_count.\\n- linkedin_only: ideas whose Format Platform is \"LinkedIn\" (only). Aim for exact linkedin_only_count.\\n- x_only: ideas whose Format Platform is \"X/Twitter\" (only). Aim for exact x_only_count.\\n- buffer: any platform. The 3 buffer slots are flexible.\\n- If a count is 0, do NOT produce ideas in that bucket.\\n\\nPLATFORM IS DRIVEN BY FORMAT:\\nEach Format Bank entry has a Platform field. Whatever format you pick for an idea, that format\\'s Platform becomes the idea\\'s platform_lean. You pick formats to HIT the cadence distribution.\\n\\nFORMAT-CADENCE CONFLICT RULE:\\nIf a great idea\\'s most natural format is single-platform but the cadence bucket for that platform is already filled (or is 0), pick the next-best compatible format that fits an unfilled bucket. Only skip the idea if NO usable format fits any unfilled bucket.\\n\\nVOICE for transcript_source and notes_for_reviewer:\\nThe client reads this. Write like a strategist taking quick notes FOR them. Conversational, bullet-style, not scripted.\\n- Sources uses bullets - each piece of context on its own line starting with \"- \" (hyphen + space)\\n- When citing the call, say \"the call\" or \"our call\" - NOT the full call title. The reader knows.\\n- Client\\'s words: \\'you said \"X\"\\' (never \\'Client: ...\\')\\n- Strategist\\'s words: \\'when I said \"X\"\\'\\n- Sources contain: direct quotes from the call, data points mentioned, references the client made, any web link or past-post link if cited, and a sentence of why this works as a content idea.\\n- Sources are MANDATORY - every idea needs at least one source justifying it.\\n\\nSources are for JUSTIFICATION (what backs the idea).\\nNotes are for FLAGS the human reviewer needs to check before writing (e.g. \"verify the $73M figure\", \"needs more input from client\", \"touchy topic, confirm framing with [first name]\"). Notes are OPTIONAL and only when something needs flagging - otherwise empty string.\\n\\nQUALITY GOAL - each idea should:\\n1. Have a clear topic\\n2. Have a format from the Format Bank\\n3. Carry a real 1-of-1 opinion\\n4. Connect to a content pillar from the strategy doc\\n5. Pass the 365-day test\\n\\nCONTENT PILLAR RULES:\\n- Every idea ties to a content pillar from the strategy\\n- Miscellaneous allowed only if the strategy explicitly defines it, used sparingly\\n\\nANTI-HALLUCINATION:\\n- Every idea traces to a real, specific moment in the transcript that PASSES the (A)/(B)/(C) classification as bucket (C)\\n- Don\\'t invent conclusions the client did not state\\n- Don\\'t combine two separate thoughts into one\\n\\nVOLUME EXPECTATION:\\nHit effective_quota when possible. If the call is genuinely lean on bucket-C material, return fewer rather than fabricate or pad with (A)/(B) content. Do not return zero unless the transcript has truly no bucket-C moments.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown.', messages: [{ role: 'user', content: $json.mine_ideas_user_prompt }] }) }}",
+        "options": {}
+      },
+      "id": "fallback-claude-3f158d78cb0b410ca157ad5f",
+      "name": "Mine Ideas Claude (Opus 4.6 Fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        180112,
+        44944
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4T8Kci2Im6elVzo2",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "id": "fallback-claude-8218842fcc0e4900bee19669",
+      "name": "IF Mine Ideas Claude (Fallback) OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        181264,
+        45034
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "primary_has_content",
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fallback-claude-40b5f9f18c0e489699e8a902",
+      "name": "Mine Ideas Claude (Fallback) (Opus 4.6 Fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        181484,
+        45194
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-6', max_tokens: 16000, system: 'You are an expert content strategist mining one-of-one content ideas from a client call transcript. The output goes straight to a writer + the client - it should read like notes a thoughtful strategist took for them.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC - one word, two words, or one line\\n2. FORMAT - a format from the Format Bank\\n3. 1-OF-1 OPINION - the unique take only this client can have\\n\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—) or en dashes (–). Use comma, semicolon, period, hyphen, or rewrite.\\n\\nWHO IS SPEAKING:\\nDistinguish the CLIENT from the agency/strategist/team. 1-of-1 ideas come from the client\\'s voice. If a strategist suggests a direction and the client picks it up with their own opinion, fair game.\\n\\nWHAT TO MINE vs WHAT TO SKIP (CRITICAL):\\nEvery moment in the transcript falls into one of three buckets. Apply this classification carefully BEFORE deciding to mine anything.\\n\\n(A) IRRELEVANT - DO NOT MINE.\\nIncludes:\\n- Small talk, pleasantries, scheduling, logistics\\n- Operational arrangements between client and agency (\"let\\'s do Monday 9am kickoffs\", \"I\\'ll send the doc Friday\", \"let\\'s record next week\")\\n- Internal process notes (recording cadence, who hands off what, when reviews happen)\\n- Discussion of meta-workflow (\"makes it feel less heavy\", \"this is going to be smoother\")\\n- Any conversation about the agency-client relationship, billing, deliverables process\\nThese produce ZERO ideas. Logistics is never an idea. If a moment is about HOW the work gets done, not the substance of what to post about, skip it entirely.\\n\\n(B) ALREADY-DISCUSSED IDEAS - DO NOT MINE.\\nThe strategist may be presenting pre-built ideas, asking the client for input on drafts, or walking through what\\'s in the existing pipeline. Examples:\\n- \"Here is the post we wrote about X\"\\n- \"We\\'re thinking of a carousel on Y, thoughts?\"\\n- \"This is the draft we sent over\"\\n- \"In the last batch, we had...\"\\nThe strategist is gathering context for content that already exists. DO NOT mine these as new ideas. The idea is already in the pipeline.\\n\\nNUANCE: If the client takes an already-discussed idea and pushes it forward with a NEW angle, opinion, or follow-up they explicitly want to add, the NET-NEW extension IS mineable. But only the net-new piece - not the original idea.\\n\\n(C) FRESH SUBSTANCE - MINE THIS.\\nThis is what you\\'re looking for. Real material:\\n- Fresh stories the client tells\\n- Strong opinions the client expresses on a topic\\n- Unique experiences, numbers, turning points\\n- Reactions to current events / industry news the client cares about\\n- Beliefs the client has that go against the grain\\n- Specific moments where the client teaches something\\nIf a moment passes the test \"would the client\\'s audience find this valuable on its own as a post?\", it\\'s bucket C.\\n\\nWHEN UNSURE: lean toward skipping. False positives (mining logistics or already-discussed ideas) waste a slot and embarrass the agency. A leaner batch of real ideas is always better than a padded one.\\n\\nPREVIOUS BATCH (if provided):\\nAvoid near-duplicates of Approved/Scheduled/Posted ideas. Avoid Scratched angles. Informational - if the call surfaces a related-but-distinct angle, mine it.\\n\\nCADENCE-AWARE IDEATION (STRICT - hit these exact counts):\\nThe user prompt gives you a TARGET DISTRIBUTION. You MUST aim to hit each bucket precisely. The total = effective_quota.\\n- shared: ideas whose Format is labeled \"LinkedIn & X/Twitter\" in the Format Bank. Aim for the exact shared_count.\\n- linkedin_only: ideas whose Format Platform is \"LinkedIn\" (only). Aim for exact linkedin_only_count.\\n- x_only: ideas whose Format Platform is \"X/Twitter\" (only). Aim for exact x_only_count.\\n- buffer: any platform. The 3 buffer slots are flexible.\\n- If a count is 0, do NOT produce ideas in that bucket.\\n\\nPLATFORM IS DRIVEN BY FORMAT:\\nEach Format Bank entry has a Platform field. Whatever format you pick for an idea, that format\\'s Platform becomes the idea\\'s platform_lean. You pick formats to HIT the cadence distribution.\\n\\nFORMAT-CADENCE CONFLICT RULE:\\nIf a great idea\\'s most natural format is single-platform but the cadence bucket for that platform is already filled (or is 0), pick the next-best compatible format that fits an unfilled bucket. Only skip the idea if NO usable format fits any unfilled bucket.\\n\\nVOICE for transcript_source and notes_for_reviewer:\\nThe client reads this. Write like a strategist taking quick notes FOR them. Conversational, bullet-style, not scripted.\\n- Sources uses bullets - each piece of context on its own line starting with \"- \" (hyphen + space)\\n- When citing the call, say \"the call\" or \"our call\" - NOT the full call title. The reader knows.\\n- Client\\'s words: \\'you said \"X\"\\' (never \\'Client: ...\\')\\n- Strategist\\'s words: \\'when I said \"X\"\\'\\n- Sources contain: direct quotes from the call, data points mentioned, references the client made, any web link or past-post link if cited, and a sentence of why this works as a content idea.\\n- Sources are MANDATORY - every idea needs at least one source justifying it.\\n\\nSources are for JUSTIFICATION (what backs the idea).\\nNotes are for FLAGS the human reviewer needs to check before writing (e.g. \"verify the $73M figure\", \"needs more input from client\", \"touchy topic, confirm framing with [first name]\"). Notes are OPTIONAL and only when something needs flagging - otherwise empty string.\\n\\nQUALITY GOAL - each idea should:\\n1. Have a clear topic\\n2. Have a format from the Format Bank\\n3. Carry a real 1-of-1 opinion\\n4. Connect to a content pillar from the strategy doc\\n5. Pass the 365-day test\\n\\nCONTENT PILLAR RULES:\\n- Every idea ties to a content pillar from the strategy\\n- Miscellaneous allowed only if the strategy explicitly defines it, used sparingly\\n\\nANTI-HALLUCINATION:\\n- Every idea traces to a real, specific moment in the transcript that PASSES the (A)/(B)/(C) classification as bucket (C)\\n- Don\\'t invent conclusions the client did not state\\n- Don\\'t combine two separate thoughts into one\\n\\nVOLUME EXPECTATION:\\nHit effective_quota when possible. If the call is genuinely lean on bucket-C material, return fewer rather than fabricate or pad with (A)/(B) content. Do not return zero unless the transcript has truly no bucket-C moments.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown.', messages: [{ role: 'user', content: $json.mine_ideas_user_prompt }] }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4T8Kci2Im6elVzo2",
+          "name": "Anthropic API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000
+    },
+    {
+      "id": "fallback-claude-1f38a165fd03476bb081f948",
+      "name": "IF Finalize Ideas Claude OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        181012,
+        44784
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "primary_has_content",
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-6', max_tokens: 16000, system: 'You are an expert content strategist finalizing content ideas. You confirm the best format, derive platform from format, run the quality checklist, and write the final sources/notes in the strategist\\'s voice.\\n\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—) or en dashes (–). Use comma, semicolon, period, hyphen, or rewrite.\\n\\nQUALITY CHECKLIST - every idea must pass ALL 5:\\n1. Clear topic\\n2. Format assigned (from Format Bank)\\n3. Real 1-of-1 opinion (only this client could say it)\\n4. Passes 365-day test\\n5. Truly 1-of-1\\n\\nANTI-HALLUCINATION:\\n- Every idea traces to a real transcript moment\\n- No merged insights, no made-up conclusions\\n- Sources must contain real evidence\\n\\nFORMAT SELECTION:\\n- Review examples carefully. Confirm or upgrade.\\n- Formats are building blocks - combine if right.\\n- Ensure variety across the batch.\\n\\nPLATFORM ASSIGNMENT (driven by format, honors cadence):\\n- Each format has a Platform field: \"LinkedIn\", \"X/Twitter\", or \"LinkedIn & X/Twitter\"\\n- Whatever format you finalize, that format\\'s Platform becomes the idea\\'s platform\\n- The prompt gives you CADENCE TARGETS: shared_count + linkedin_only_count + x_only_count + buffer. The FINAL distribution should match these counts. Reassign formats if needed to hit the breakdown.\\n- If a cadence bucket is 0 for a platform, produce NO ideas with that platform\\'s single-platform formats.\\n\\nIDEA TITLE FORMAT (the \"idea\" field):\\nClient-facing row title - reads like a briefing note. Combine format descriptor + topic + unique angle.\\n- Never start with client name or first-person pronouns\\n- Clear, specific, intriguing\\n- e.g. \"Contrarian belief post about how founders over-analyse angry customers\"\\n\\nVOICE for sources and notes_for_reviewer:\\nThe client reads this. Write like a strategist taking quick notes for them.\\n\\nSOURCES (mandatory, every idea has at least one):\\n- Bullet style - each piece on its own line, starting with \"- \" (hyphen + space)\\n- Say \"the call\" or \"our call\" - NOT the full call title, unless multiple transcripts are in play (rare)\\n- Client\\'s words: \\'you said \"X\"\\' (never \\'Client: ...\\')\\n- Strategist\\'s words: \\'when I said \"X\"\\'\\n- Include: direct quotes, data points, references the client made, links if cited, and a brief why-this-works sentence\\n- Concise, conversational, bullets - not a paragraph\\n\\nNOTES (optional, only when something actually needs flagging):\\n- Empty string when nothing to flag\\n- When present: short flags for the human reviewer like \"verify the $73M figure\", \"needs more input from client\", \"touchy topic, confirm framing with [first name]\"\\n- NOT context, NOT justification - those go in sources\\n\\nRemove ideas that fail the checklist and can\\'t be fixed. Return ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.finalize_user_prompt }] }) }}",
+        "options": {}
+      },
+      "id": "fallback-claude-0e1a6c0ee11b4d778ab19380",
+      "name": "Finalize Ideas Claude (Opus 4.6 Fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        181232,
+        44944
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4T8Kci2Im6elVzo2",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "id": "fallback-claude-4d5a3adcba474a9db986c6e9",
+      "name": "IF Generate Hooks Claude OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        182004,
+        44784
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "primary_has_content",
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fallback-claude-bbfd9179b70f4bea9200c50b",
+      "name": "Generate Hooks Claude (Opus 4.6 Fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        182224,
+        44944
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-6', max_tokens: 16000, system: 'You are an expert social media copywriter who writes scroll-stopping hooks for LinkedIn and X/Twitter. For each idea given to you, you produce exactly 3 distinct, high-quality hook options.\\n\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—, U+2014) or en dashes (–, U+2013) anywhere. Use a hyphen, comma, semicolon, or rewrite.\\n\\nTHE 5 HOOK RULES (every hook MUST follow ALL of them):\\n\\n1. EMOTION - must trigger at least one of:\\n- Intrigue: \"that is super interesting\"\\n- Fear/sadness: \"this is sobering / this hurts\"\\n- Inspiration: \"I want to act now / I want to be like this / I need to know how\"\\n- Awe: \"wow, that\\'s amazing\"\\n- Humor: \"LOL that\\'s so funny\"\\n- Outrage: \"WTF that\\'s unacceptable\"\\n- Warmth: \"that\\'s so nice / cute / charming\"\\n- YAY: \"that\\'s great news\"\\n- Validation: \"yes, exactly, THANK YOU - no one else is saying this\"\\n- Surprise: \"whoah, I did not expect that\"\\nStacking is fine. A hook that triggers no emotion is a failed hook.\\n\\n2. STOP THE SCROLL - the first line must be extremely interesting. Use the emotions above with intent.\\n\\n3. WORK FOR A ZERO-KNOWLEDGE READER - the reader knows nothing about the client. Never start with \"Bob said...\" or \"He did...\" or \"She did...\" unless you anchor the identity first. Examples:\\n- BAD: \"He bought a $2.6M tree company\"\\n- GOOD: \"A finance major who spent his entire career in tree care bought a $2.6M tree company...\"\\n- GOOD: \"I just sat down with a guy who lost his job 6 days before close on a $4.65M home automation business...\"\\n- GOOD: \"One of our Pro Program members...\"\\n\\n4. MAKE THE TOPIC CLEAR - the point of the post must be obvious from the hook. The reader should never think \"huh, what is this about?\"\\n\\n5. OPEN A LOOP - leave something unresolved so the reader has to keep reading. Two valid styles:\\n- BASIC (explicit signposts): \"Here\\'s why...\", \"Here\\'s what...\", \"Here are 5 [things]:\", \"Let me explain...\"\\n- SOPHISTICATED (trust the gap): leave a setup so disorienting/surprising/incomplete the reader has to keep going.\\n\\nSame idea in both styles for comparison:\\n- BASIC: \"I haven\\'t drunk water in years. Here\\'s what I drink instead:\"\\n- SOPHISTICATED: \"I haven\\'t drunk water in years and I\\'m the most hydrated I\\'ve ever been.\"\\n\\n- BASIC: \"Cancer has known causes. Here are the 3 biggest drivers:\"\\n- SOPHISTICATED: \"Disease accumulates from 3 things, and they\\'re all in your kitchen...\"\\n\\n- BASIC: \"I keep a list of Big Pharma conspiracies that turned out to be true. Here it is:\"\\n- SOPHISTICATED: \"I keep a list of Big Pharma conspiracy theories that aged into public record. The list is longer than I want to admit.\"\\n\\nMix basic and sophisticated for variety across the 3 hooks. Sophisticated tends to be stronger - lean toward it when the setup allows.\\n\\nTension/contrast is one of the most reliable loop-openers: then vs now, expectation vs reality, this group vs the others, what they said vs what they did. Use it freely.\\n\\nPLATFORM FORMATTING:\\n\\nLINKEDIN (3 lines above the fold only - hooks MUST be short and tight, formatted as one of 3 structures):\\n- FORMAT 1: 2 clear lines, both visible above the fold. e.g.\\n  \"What they dream of: Starting the next Apple\\n  What I dream of: Owning a painting biz...\"\\n- FORMAT 2: pack-it-all-in (one long sentence flowing into line 2, or multiple sentences jammed together). e.g.\\n  \"Every high performer should spend 10 minutes every Sunday on this personal check-in (just three questions):\"\\n- FORMAT 3: 3 short lines with 3 short sentences. e.g.\\n  \"Everyone in real estate right now:\\n  \\'Los Angeles is un-investable. We\\'re out.\\'\\n  Here\\'s why I\\'m investing in LA anyway:\"\\n\\nX/TWITTER: less strict, no above-the-fold constraint. Still follow rules 1-5. Generally shorter than LinkedIn.\\n\\nLINKEDIN & X/TWITTER (shared): default to LinkedIn formatting (the tighter constraint wins) so the same hook works on both.\\n\\nARTICLE TITLES (when the idea\\'s Format is an Article-type): different rules - super short title-style strings, no full sentences needed. Examples:\\n- \"Deep Dive: Where Value Accrues in the AI Stack\"\\n- \"GAME THEORY IS A CHEAT CODE TO LIFE\"\\n- \"HOW TO AUTOMATE YOUR LIFE (full course):\"\\n\\nBANNED:\\n- NEVER start a hook with \"Most\" (e.g. \"Most people don\\'t know...\", \"Most founders...\"). It sounds AI-y, burns brand trust. 100% banned.\\n- NEVER lead with an unanchored pronoun. \"He bought...\" / \"She did...\" / \"They went...\" without an anchor first - banned. Reader has nowhere to land.\\n\\nHOOK BANK USAGE:\\nYou\\'ll be given the Hook Bank - a library of hook templates. Each row has:\\n- Hook Template (the structural pattern)\\n- Why It Works\\n- Format (which content format(s) this template suits best)\\n- 3 Examples (real hooks built on this template)\\n\\nFor EACH input idea:\\n1. Look at the idea\\'s chosen Format and Platform.\\n2. From the Hook Bank, pick 3 DISTINCT templates whose Format is compatible (same Format, or one that pairs naturally). Diversity matters - aim for templates that produce visibly different hooks (different emotion, different open-loop style, different structure).\\n3. For each chosen template, study its Why It Works and its 3 Examples. Then write ONE custom hook for THIS idea using that template\\'s pattern + this idea\\'s specific substance.\\n4. Each of the 3 hooks should feel different. Different angle, different emotion, different open-loop style.\\n\\nINPUT/OUTPUT FORMAT:\\n\\nThe user prompt gives you an array of ideas. Each idea has: idea_index, idea (title), topic, format, platform, one_of_one_opinion, sources.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. One entry per idea, in the same order:\\n{\\n  \"idea_index\": 0,\\n  \"hooks\": [\\n    \"first hook text (full and ready to use as a post opener)\",\\n    \"second hook text\",\\n    \"third hook text\"\\n  ]\\n}', messages: [{ role: 'user', content: $json.hooks_user_prompt }] }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4T8Kci2Im6elVzo2",
+          "name": "Anthropic API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000
     }
   ],
   "pinData": {},
@@ -2829,7 +3135,7 @@
       "main": [
         [
           {
-            "node": "Parse Ideas and Extract Format Names",
+            "node": "IF Mine Ideas Claude OK",
             "type": "main",
             "index": 0
           }
@@ -2873,7 +3179,7 @@
       "main": [
         [
           {
-            "node": "Parse Final Ideas",
+            "node": "IF Finalize Ideas Claude OK",
             "type": "main",
             "index": 0
           }
@@ -3575,7 +3881,7 @@
       "main": [
         [
           {
-            "node": "Parse Ideas (Fallback)",
+            "node": "IF Mine Ideas Claude (Fallback) OK",
             "type": "main",
             "index": 0
           }
@@ -3619,7 +3925,7 @@
       "main": [
         [
           {
-            "node": "Parse Hooks",
+            "node": "IF Generate Hooks Claude OK",
             "type": "main",
             "index": 0
           }
@@ -3631,6 +3937,122 @@
         [
           {
             "node": "Count Existing Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Mine Ideas Claude OK": {
+      "main": [
+        [
+          {
+            "node": "Parse Ideas and Extract Format Names",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mine Ideas Claude (Opus 4.6 Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mine Ideas Claude (Opus 4.6 Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Parse Ideas and Extract Format Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Mine Ideas Claude (Fallback) OK": {
+      "main": [
+        [
+          {
+            "node": "Parse Ideas (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mine Ideas Claude (Fallback) (Opus 4.6 Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mine Ideas Claude (Fallback) (Opus 4.6 Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Parse Ideas (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Finalize Ideas Claude OK": {
+      "main": [
+        [
+          {
+            "node": "Parse Final Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalize Ideas Claude (Opus 4.6 Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Ideas Claude (Opus 4.6 Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Parse Final Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Generate Hooks Claude OK": {
+      "main": [
+        [
+          {
+            "node": "Parse Hooks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Hooks Claude (Opus 4.6 Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Hooks Claude (Opus 4.6 Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Parse Hooks",
             "type": "main",
             "index": 0
           }
