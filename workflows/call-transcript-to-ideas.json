@@ -716,8 +716,8 @@
         44784
       ],
       "retryOnFail": true,
-      "maxTries": 5,
-      "waitBetweenTries": 5000,
+      "maxTries": 10,
+      "waitBetweenTries": 30000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "4T8Kci2Im6elVzo2",
@@ -823,8 +823,8 @@
         44784
       ],
       "retryOnFail": true,
-      "maxTries": 5,
-      "waitBetweenTries": 15000,
+      "maxTries": 10,
+      "waitBetweenTries": 30000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "4T8Kci2Im6elVzo2",
@@ -2376,8 +2376,8 @@
         }
       },
       "retryOnFail": true,
-      "maxTries": 5,
-      "waitBetweenTries": 15000
+      "maxTries": 10,
+      "waitBetweenTries": 30000
     },
     {
       "id": "fallback-mine-0001-4000-8000-000000000006",
@@ -2481,8 +2481,8 @@
         }
       },
       "retryOnFail": true,
-      "maxTries": 5,
-      "waitBetweenTries": 15000
+      "maxTries": 10,
+      "waitBetweenTries": 30000
     },
     {
       "id": "hooks-chain-0001-4000-8000-000000000004",
