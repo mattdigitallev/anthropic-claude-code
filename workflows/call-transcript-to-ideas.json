@@ -2517,19 +2517,19 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": false,
             "leftValue": "",
             "typeValidation": "loose"
           },
           "conditions": [
             {
-              "id": "primary_has_content",
-              "leftValue": "={{ $json.content }}",
-              "rightValue": "",
+              "id": "claude_response_succeeded",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "message",
               "operator": {
-                "type": "object",
-                "operation": "exists",
-                "singleValue": true
+                "type": "string",
+                "operation": "equals",
+                "caseSensitive": false
               }
             }
           ],
@@ -2592,19 +2592,19 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": false,
             "leftValue": "",
             "typeValidation": "loose"
           },
           "conditions": [
             {
-              "id": "primary_has_content",
-              "leftValue": "={{ $json.content }}",
-              "rightValue": "",
+              "id": "claude_response_succeeded",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "message",
               "operator": {
-                "type": "object",
-                "operation": "exists",
-                "singleValue": true
+                "type": "string",
+                "operation": "equals",
+                "caseSensitive": false
               }
             }
           ],
@@ -2666,19 +2666,19 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": false,
             "leftValue": "",
             "typeValidation": "loose"
           },
           "conditions": [
             {
-              "id": "primary_has_content",
-              "leftValue": "={{ $json.content }}",
-              "rightValue": "",
+              "id": "claude_response_succeeded",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "message",
               "operator": {
-                "type": "object",
-                "operation": "exists",
-                "singleValue": true
+                "type": "string",
+                "operation": "equals",
+                "caseSensitive": false
               }
             }
           ],
@@ -2741,19 +2741,19 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": false,
             "leftValue": "",
             "typeValidation": "loose"
           },
           "conditions": [
             {
-              "id": "primary_has_content",
-              "leftValue": "={{ $json.content }}",
-              "rightValue": "",
+              "id": "claude_response_succeeded",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "message",
               "operator": {
-                "type": "object",
-                "operation": "exists",
-                "singleValue": true
+                "type": "string",
+                "operation": "equals",
+                "caseSensitive": false
               }
             }
           ],
