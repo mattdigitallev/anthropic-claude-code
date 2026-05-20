@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst submissionPageId = input.id || '';\n\n// Accept both orchestrator-mapped field names and raw Notion field names.\nconst clientName = input.client_name || input['Client'] || '';\n// Week Of from Notion can be a date string, an ISO timestamp, or a Notion date property object\nfunction extractDateString(v) {\n  if (!v) return '';\n  if (typeof v === 'string') return v;\n  if (typeof v === 'object') {\n    return v.start || v.date?.start || v.value || '';\n  }\n  return String(v);\n}\nlet batchDateRaw = extractDateString(input.batch_date) || extractDateString(input['Week Of']);\nlet batchDate = batchDateRaw ? batchDateRaw.substring(0, 10) : DateTime.now().toFormat('yyyy-MM-dd');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(batchDate)) {\n  // Last resort — try Date.parse, fall back to today\n  const parsed = new Date(batchDateRaw);\n  batchDate = isNaN(parsed.getTime()) ? DateTime.now().toFormat('yyyy-MM-dd') : parsed.toISOString().substring(0, 10);\n}\nconst notesRaw = (input.notes_for_ai || input['Notes for AI'] || '').trim();\nconst callNumberOverride = input.call_number_override || null;\n\nlet specificCallRef = null;\nconst callNumMatch = notesRaw.match(/(?:use|from|based on|refer to)\\s+call\\s+(?:#|number\\s+)?(\\d+)/i);\nconst dateMatch    = notesRaw.match(/(?:use|from|based on|refer to).*?(?:call|transcript).*?\\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s*(?:\\d{4})?)/i);\n\nif (callNumMatch) {\n  specificCallRef = { type: 'call_number', value: callNumMatch[1] };\n} else if (dateMatch) {\n  specificCallRef = { type: 'date', value: dateMatch[1] };\n}\n\n// Detect Grain recording URL pasted into Notes for AI (overrides call selection)\nconst grainUrlPattern = /https?:\\/\\/(?:grain\\.com|app\\.grain\\.com)\\/(?:share\\/recording|recordings?)\\/([a-zA-Z0-9_-]+)/i;\nconst grainUrlMatch = notesRaw.match(grainUrlPattern);\nif (grainUrlMatch && !specificCallRef) {\n  specificCallRef = { type: 'grain_url', grain_recording_id: grainUrlMatch[1], original_url: grainUrlMatch[0] };\n}\n\n// Week Of date is captured for record keeping (batch_date) but is no longer used to filter calls.\n// Selection logic now picks the most recent substantive client call (or a Notes-for-AI override).\n\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign  = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\nreturn [{\n  json: {\n    client_name:              clientName,\n    batch_date:               batchDate,\n    notes_for_ai:             notesRaw,\n    call_number_override:     callNumberOverride,\n    specific_call_ref:        specificCallRef,\n    has_specific_call_override: specificCallRef !== null,\n    call_sign:                callSign,\n    submission_page_id:       submissionPageId,\n  }\n}];"
+        "jsCode": "const input = $input.first().json;\nconst submissionPageId = input.id || '';\n\n// Accept both orchestrator-mapped field names and raw Notion field names.\nconst clientName = input.client_name || input['Client'] || '';\n\nfunction extractDateString(v) {\n  if (!v) return '';\n  if (typeof v === 'string') return v;\n  if (typeof v === 'object') {\n    return v.start || v.date?.start || v.value || '';\n  }\n  return String(v);\n}\nlet batchDateRaw = extractDateString(input.batch_date) || extractDateString(input['Week Of']);\nlet batchDate = batchDateRaw ? batchDateRaw.substring(0, 10) : DateTime.now().toFormat('yyyy-MM-dd');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(batchDate)) {\n  const parsed = new Date(batchDateRaw);\n  batchDate = isNaN(parsed.getTime()) ? DateTime.now().toFormat('yyyy-MM-dd') : parsed.toISOString().substring(0, 10);\n}\n\nconst notesRaw = (input.notes_for_ai || input['Notes for AI'] || '').trim();\nconst callNumberOverride = input.call_number_override || null;\n\n// NEW (Phase 1a): explicit-source model\n// Sources is a multi-select (array of selected source type names)\nconst sourcesRaw = input.sources || input['Sources'] || [];\nconst sources = Array.isArray(sourcesRaw) ? sourcesRaw : (sourcesRaw ? [sourcesRaw] : []);\n\n// Call Transcript Details is a rich-text field — strategist pastes Grain URL(s) + optional context\nconst callTranscriptDetails = (input.call_transcript_details || input['Call Transcript Details'] || '').trim();\n\n// Validate: Sources is mandatory\nif (sources.length === 0) {\n  throw new Error('Sources is required. The strategist must select at least one source on the Ideation Launcher form (e.g., \"Call Transcript\"). Re-submit with at least one source selected.');\n}\n\n// Phase 1a: only Call Transcript is supported for now\nconst supportedSources = new Set(['Call Transcript']);\nconst unsupported = sources.filter(s => !supportedSources.has(s));\nif (unsupported.length > 0 && !sources.some(s => supportedSources.has(s))) {\n  throw new Error('None of the selected sources are supported yet. Phase 1 supports: Call Transcript. Selected: ' + sources.join(', '));\n}\n\n// Parse Grain URLs from Call Transcript Details\nconst grainUrlPattern = /https?:\\/\\/(?:grain\\.com|app\\.grain\\.com)\\/(?:share\\/recording|recordings?)\\/([a-zA-Z0-9_-]+)/gi;\nconst grainUrlsFromDetails = [];\nlet m;\nwhile ((m = grainUrlPattern.exec(callTranscriptDetails)) !== null) {\n  grainUrlsFromDetails.push({ url: m[0], grain_recording_id: m[1] });\n}\n\n// Validate: if Call Transcript is selected, at least one Grain URL must be present\nconst callTranscriptSelected = sources.includes('Call Transcript');\nif (callTranscriptSelected && grainUrlsFromDetails.length === 0) {\n  throw new Error('You selected \"Call Transcript\" as a source but did not paste any Grain URL into the \"Call Transcript Details\" field. Paste at least one Grain recording URL (e.g., https://grain.com/share/recording/XXXX) and re-submit.');\n}\n\n// For Phase 1a, use the FIRST Grain URL as the explicit call.\n// Phase 1b will add multi-URL support via SplitInBatches.\nlet specificCallRef = null;\nif (grainUrlsFromDetails.length > 0) {\n  specificCallRef = {\n    type: 'grain_url',\n    grain_recording_id: grainUrlsFromDetails[0].grain_recording_id,\n    original_url: grainUrlsFromDetails[0].url,\n    source_field: 'Call Transcript Details'\n  };\n  if (grainUrlsFromDetails.length > 1) {\n    console.log('Note: multi-URL support is Phase 1b. ' + grainUrlsFromDetails.length + ' URLs were pasted; using only the first (' + grainUrlsFromDetails[0].grain_recording_id + ') for this run.');\n  }\n}\n\n// Legacy: also check Notes for AI for a Grain URL (back-compat for older submissions)\nif (!specificCallRef) {\n  const legacyMatch = notesRaw.match(/https?:\\/\\/(?:grain\\.com|app\\.grain\\.com)\\/(?:share\\/recording|recordings?)\\/([a-zA-Z0-9_-]+)/i);\n  if (legacyMatch) {\n    specificCallRef = {\n      type: 'grain_url',\n      grain_recording_id: legacyMatch[1],\n      original_url: legacyMatch[0],\n      source_field: 'Notes for AI (legacy)'\n    };\n  }\n}\n\n// Compute call sign and clean name (still used for batch naming)\nconst cleanName = clientName.replace(/\\s*\\(.*?\\)\\s*/g, '').trim();\nconst callSign  = cleanName.split(/\\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('');\n\n// Combine notes_for_ai with any non-URL text from Call Transcript Details\nconst detailsWithoutUrls = callTranscriptDetails.replace(grainUrlPattern, '').trim();\nconst combinedNotes = [notesRaw, detailsWithoutUrls]\n  .filter(s => s && s.length > 0)\n  .join('\\n\\n');\n\nconsole.log('Pre-process: client=' + clientName + ', sources=[' + sources.join(', ') + '], grain_url_count=' + grainUrlsFromDetails.length + ', specific_call=' + (specificCallRef ? specificCallRef.grain_recording_id : '(none)'));\n\nreturn [{\n  json: {\n    submission_page_id: submissionPageId,\n    client_name: clientName,\n    batch_date: batchDate,\n    notes_for_ai: combinedNotes,\n    sources: sources,\n    call_transcript_urls: grainUrlsFromDetails,\n    call_transcript_details_text: callTranscriptDetails,\n    specific_call_ref: specificCallRef,\n    call_number_override: callNumberOverride,\n    call_sign: callSign,\n    clean_client_name: cleanName,\n    submitted_by_email: (input['Submitted By'] && input['Submitted By'][0]) || '',\n  }\n}];"
       },
       "id": "e1644884-83c9-49bf-8e1d-a3be66cc860c",
       "name": "Pre-process Inputs",
@@ -267,7 +267,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\nconst primaryEmail   = (contextData.primary_email   || '').toLowerCase().trim();\nconst secondaryEmail = (contextData.secondary_email || '').toLowerCase().trim();\n\nconst allRecordings = (grainRaw?.recordings || []).filter(c => !!c?.id);\nconst notionRows = notionRaw?.results || [];\nconst allRows = notionRows;\n\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\n\nconst MIN_DURATION_SEC = 600;\n\nfunction pickRecordingDate(r) {\n  if (!r) return '';\n  const candidates = [r.start_datetime, r.started_at, r.recorded_at, r.meeting_start_at, r.meeting_started_at, r.record_started_at, r.created_at];\n  for (const c of candidates) {\n    if (c == null || c === '') continue;\n    if (typeof c === 'number') return new Date(c * (c < 1e12 ? 1000 : 1)).toISOString();\n    if (typeof c === 'string') return c;\n  }\n  return '';\n}\nfunction recordingDurationSec(r) {\n  if (typeof r?.duration === 'number') return r.duration;\n  if (typeof r?.duration_seconds === 'number') return r.duration_seconds;\n  const start = pickRecordingDate(r);\n  const end = r?.end_datetime || r?.ended_at || r?.meeting_end_at || '';\n  if (start && end) {\n    const s = new Date(start).getTime();\n    const e = new Date(end).getTime();\n    if (!isNaN(s) && !isNaN(e) && e > s) return Math.round((e - s) / 1000);\n  }\n  return 0;\n}\nfunction rowCallTitle(row) {\n  const props = row?.properties || {};\n  for (const [, v] of Object.entries(props)) {\n    if (v?.type === 'title') {\n      const t = (v.title || []).map(rt => rt?.plain_text || '').join('');\n      if (t) return t;\n    }\n  }\n  return '';\n}\nfunction rowCallNumber(row) {\n  const m = (rowCallTitle(row) || '').match(/Call\\s+(\\d+)/i);\n  return m ? parseInt(m[1], 10) : 0;\n}\nfunction rowCallDate(row) { return row?.properties?.['Call Date']?.date?.start || ''; }\nfunction rowTranscriptUrl(row) {\n  return row?.properties?.['Transcript URL']?.url || row?.properties?.['Transcript Doc']?.url\n    || row?.properties?.['Transcript Link']?.url || row?.properties?.['Transcript']?.url || '';\n}\nfunction rowGrainIdText(row) {\n  return row?.properties?.['Grain Recording ID']?.rich_text?.[0]?.plain_text\n    || row?.properties?.['Grain ID']?.rich_text?.[0]?.plain_text || '';\n}\nfunction rowContainsGrainId(row, grainId) {\n  if (!grainId) return false;\n  for (const [, v] of Object.entries(row?.properties || {})) {\n    if (!v) continue;\n    if (v.type === 'url' && v.url && v.url.includes(grainId)) return true;\n    if (v.type === 'rich_text') { const t = (v.rich_text || []).map(rt => rt?.plain_text || '').join(''); if (t.includes(grainId)) return true; }\n    if (v.type === 'title') { const t = (v.title || []).map(rt => rt?.plain_text || '').join(''); if (t.includes(grainId)) return true; }\n  }\n  return false;\n}\nfunction findRowByGrainId(grainId) {\n  return notionRows.find(r => rowGrainIdText(r) === grainId || rowContainsGrainId(r, grainId));\n}\n\nconst maxCallNumber = allRows.reduce((max, r) => Math.max(max, rowCallNumber(r)), 0);\nconst nextCallNumber = maxCallNumber + 1;\nconsole.log(`Call Agendas has ${allRows.length} row(s), max parsed Call N = ${maxCallNumber}, next would be Call ${nextCallNumber}.`);\n\nif (!clientName) return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty.' } }];\n\nfunction buildFallbackList(allClientCalls, primaryId) {\n  // Use ALL email-matched client calls (not just substantive) so we always have alternatives\n  // when the primary fails. The 10-min duration filter only applies to the primary pick.\n  const sorted = [...allClientCalls].sort((a, b) =>\n    new Date(pickRecordingDate(b) || 0) - new Date(pickRecordingDate(a) || 0)\n  );\n  return sorted\n    .filter(r => r.id !== primaryId)\n    .slice(0, 10)\n    .map(r => ({\n      id: r.id,\n      title: r.title || ('Recording ' + r.id),\n      date: pickRecordingDate(r),\n      duration_sec: recordingDurationSec(r)\n    }));\n}\n\nfunction reuseExistingRow(row, grainIdHint, source, fallbackCandidates) {\n  const transcriptUrl = rowTranscriptUrl(row);\n  const existingNum = rowCallNumber(row);\n  const storedGrainId = rowGrainIdText(row) || grainIdHint || '';\n  console.log(`Reusing existing Call Agendas row \"${rowCallTitle(row)}\" via ${source}. Has transcript: ${!!transcriptUrl}. ${fallbackCandidates.length} fallback(s) available.`);\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      agenda_row_id: row.id,\n      transcript_doc_url: transcriptUrl,\n      call_title: rowCallTitle(row) || 'Untitled Call',\n      latest_grain_call_id: storedGrainId,\n      latest_grain_call_date: rowCallDate(row),\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : (existingNum || nextCallNumber),\n      use_existing_transcript: !!transcriptUrl,\n      used_prev_week: false,\n      selection_source: source,\n      fallback_candidates: fallbackCandidates\n    }\n  }];\n}\n\nfunction emitGrainPick(pick, existing, sourceLabel, fallbackCandidates) {\n  const pickedDate = pickRecordingDate(pick);\n  console.log(`${sourceLabel} pick: id=${pick.id}, title=\"${pick.title || ''}\", date=${pickedDate}, duration_sec=${recordingDurationSec(pick)}, ${fallbackCandidates.length} fallback(s).`);\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: pick.id,\n      latest_grain_call_title: pick.title || '',\n      latest_grain_call_date: pickedDate,\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : nextCallNumber,\n      existing_agenda_row_id: existing ? existing.id : null,\n      use_existing_transcript: false,\n      used_prev_week: false,\n      selection_source: sourceLabel,\n      fallback_candidates: fallbackCandidates\n    }\n  }];\n}\n\n// Path 1: Notes override\nconst notesGrainId = preprocess.specific_call_ref?.type === 'grain_url' ? preprocess.specific_call_ref.grain_recording_id : null;\nconst dashboardGrainId = contextData.grain_recording_id || '';\nconst overrideRecordingId = notesGrainId || dashboardGrainId;\n\nif (overrideRecordingId) {\n  // For explicit override, no fallbacks — the user picked this specific call.\n  const existing = findRowByGrainId(overrideRecordingId);\n  if (existing && rowTranscriptUrl(existing)) return reuseExistingRow(existing, overrideRecordingId, 'notes_override_matched_existing', []);\n  const specificRec = allRecordings.find(r => r.id === overrideRecordingId);\n  if (specificRec) return emitGrainPick(specificRec, existing, 'notes_override', []);\n  return [{ json: { ...contextData, abort: false, client_name: clientName, call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    latest_grain_call_id: overrideRecordingId, latest_grain_call_title: 'Recording ' + overrideRecordingId, latest_grain_call_date: '',\n    new_call_number: callNumberOverride > 0 ? callNumberOverride : nextCallNumber,\n    existing_agenda_row_id: existing ? existing.id : null,\n    use_existing_transcript: false, used_prev_week: false, selection_source: 'notes_override_id_only',\n    fallback_candidates: [] } }];\n}\n\n// Path 2: Most recent substantive client call\nif (!primaryEmail && !secondaryEmail) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true, abort_reason: 'No Primary Email or Secondary Email set on ' + clientName + \"'s Notion page.\" } }];\n}\nif (allRecordings.length === 0) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true, abort_reason: 'Grain returned 0 recordings.' } }];\n}\n\nconst targetEmails = [primaryEmail, secondaryEmail].filter(Boolean);\nfunction recordingHasClient(r) {\n  const parts = r.participants || r.participant_list || [];\n  return parts.some(p => { const email = (p?.email || '').toLowerCase().trim(); return email && targetEmails.includes(email); });\n}\n\nconst candidateClientCalls = allRecordings.filter(recordingHasClient);\nconst substantiveClientCalls = candidateClientCalls.filter(r => {\n  const d = recordingDurationSec(r);\n  if (d > 0 && d < MIN_DURATION_SEC) {\n    console.log(`Skipping dud call ${r.id} (${r.title || ''}) — duration ${d}s < ${MIN_DURATION_SEC}s.`);\n    return false;\n  }\n  return true;\n});\nconsole.log(`Client calls (email match): ${candidateClientCalls.length}, after dud filter: ${substantiveClientCalls.length}.`);\n\nif (substantiveClientCalls.length === 0) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No substantive client calls found in Grain for ' + clientName + ' (all under ' + MIN_DURATION_SEC + 's).' } }];\n}\n\nconst sortedByDateDesc = [...substantiveClientCalls].sort((a, b) =>\n  new Date(pickRecordingDate(b) || 0) - new Date(pickRecordingDate(a) || 0)\n);\n\nconst pick = sortedByDateDesc[0];\nlet fallbacks = buildFallbackList(candidateClientCalls, pick.id);\nconsole.log('Fallback list from email-matched calls (' + fallbacks.length + '): ' +\n  fallbacks.map(f => f.id + ' [' + (f.date || '').substring(0,10) + ', ' + f.duration_sec + 's]').join(' | '));\n\n// Last resort: if there are no email-matched alternatives, widen the net to ALL recent recordings.\n// This may include internal team calls — mining will simply return 0 and we'll fall through to a clean error.\n// But it lets the workflow take a real second shot when the email field on the client page is wrong/missing.\nif (fallbacks.length === 0) {\n  fallbacks = buildFallbackList(allRecordings, pick.id);\n  console.log('No email-matched fallbacks. Widened to ALL Grain recordings (' + fallbacks.length + '): ' +\n    fallbacks.map(f => f.id + ' [' + (f.date || '').substring(0,10) + ', ' + f.duration_sec + 's]').join(' | '));\n}\nconst existing = findRowByGrainId(pick.id);\nif (existing && rowTranscriptUrl(existing)) return reuseExistingRow(existing, pick.id, 'most_recent_matched_existing', fallbacks);\nreturn emitGrainPick(pick, existing, 'most_recent', fallbacks);\n"
+        "jsCode": "const allItems = $input.all();\nconst contextData = $('Extract Context and Calculate Quota').first().json;\nconst preprocess = $('Pre-process Inputs').first().json || {};\n\nconst grainRaw = allItems[0]?.json;\nconst notionRaw = allItems[1]?.json;\n\nconst clientName = preprocess.client_name || contextData.client_name || '';\nconst callSign = contextData.call_sign_override || preprocess.call_sign_override || preprocess.call_sign || contextData.call_sign || '';\nconst primaryEmail   = (contextData.primary_email   || '').toLowerCase().trim();\nconst secondaryEmail = (contextData.secondary_email || '').toLowerCase().trim();\n\nconst allRecordings = (grainRaw?.recordings || []).filter(c => !!c?.id);\nconst notionRows = notionRaw?.results || [];\nconst allRows = notionRows;\n\nconst callNumberOverride = parseInt(preprocess.call_number_override, 10);\n\nconst MIN_DURATION_SEC = 600;\n\nfunction pickRecordingDate(r) {\n  if (!r) return '';\n  const candidates = [r.start_datetime, r.started_at, r.recorded_at, r.meeting_start_at, r.meeting_started_at, r.record_started_at, r.created_at];\n  for (const c of candidates) {\n    if (c == null || c === '') continue;\n    if (typeof c === 'number') return new Date(c * (c < 1e12 ? 1000 : 1)).toISOString();\n    if (typeof c === 'string') return c;\n  }\n  return '';\n}\nfunction recordingDurationSec(r) {\n  if (typeof r?.duration === 'number') return r.duration;\n  if (typeof r?.duration_seconds === 'number') return r.duration_seconds;\n  const start = pickRecordingDate(r);\n  const end = r?.end_datetime || r?.ended_at || r?.meeting_end_at || '';\n  if (start && end) {\n    const s = new Date(start).getTime();\n    const e = new Date(end).getTime();\n    if (!isNaN(s) && !isNaN(e) && e > s) return Math.round((e - s) / 1000);\n  }\n  return 0;\n}\nfunction rowCallTitle(row) {\n  const props = row?.properties || {};\n  for (const [, v] of Object.entries(props)) {\n    if (v?.type === 'title') {\n      const t = (v.title || []).map(rt => rt?.plain_text || '').join('');\n      if (t) return t;\n    }\n  }\n  return '';\n}\nfunction rowCallNumber(row) {\n  const m = (rowCallTitle(row) || '').match(/Call\\s+(\\d+)/i);\n  return m ? parseInt(m[1], 10) : 0;\n}\nfunction rowCallDate(row) { return row?.properties?.['Call Date']?.date?.start || ''; }\nfunction rowTranscriptUrl(row) {\n  return row?.properties?.['Transcript URL']?.url || row?.properties?.['Transcript Doc']?.url\n    || row?.properties?.['Transcript Link']?.url || row?.properties?.['Transcript']?.url || '';\n}\nfunction rowGrainIdText(row) {\n  return row?.properties?.['Grain Recording ID']?.rich_text?.[0]?.plain_text\n    || row?.properties?.['Grain ID']?.rich_text?.[0]?.plain_text || '';\n}\nfunction rowContainsGrainId(row, grainId) {\n  if (!grainId) return false;\n  for (const [, v] of Object.entries(row?.properties || {})) {\n    if (!v) continue;\n    if (v.type === 'url' && v.url && v.url.includes(grainId)) return true;\n    if (v.type === 'rich_text') { const t = (v.rich_text || []).map(rt => rt?.plain_text || '').join(''); if (t.includes(grainId)) return true; }\n    if (v.type === 'title') { const t = (v.title || []).map(rt => rt?.plain_text || '').join(''); if (t.includes(grainId)) return true; }\n  }\n  return false;\n}\nfunction findRowByGrainId(grainId) {\n  return notionRows.find(r => rowGrainIdText(r) === grainId || rowContainsGrainId(r, grainId));\n}\n\nconst maxCallNumber = allRows.reduce((max, r) => Math.max(max, rowCallNumber(r)), 0);\nconst nextCallNumber = maxCallNumber + 1;\nconsole.log(`Call Agendas has ${allRows.length} row(s), max parsed Call N = ${maxCallNumber}, next would be Call ${nextCallNumber}.`);\n\nif (!clientName) return [{ json: { ...contextData, abort: true, abort_reason: 'client_name is empty.' } }];\n\nfunction buildFallbackList(allClientCalls, primaryId) {\n  // Use ALL email-matched client calls (not just substantive) so we always have alternatives\n  // when the primary fails. The 10-min duration filter only applies to the primary pick.\n  const sorted = [...allClientCalls].sort((a, b) =>\n    new Date(pickRecordingDate(b) || 0) - new Date(pickRecordingDate(a) || 0)\n  );\n  return sorted\n    .filter(r => r.id !== primaryId)\n    .slice(0, 5)\n    .map(r => ({\n      id: r.id,\n      title: r.title || ('Recording ' + r.id),\n      date: pickRecordingDate(r),\n      duration_sec: recordingDurationSec(r)\n    }));\n}\n\nfunction reuseExistingRow(row, grainIdHint, source, fallbackCandidates) {\n  const transcriptUrl = rowTranscriptUrl(row);\n  const existingNum = rowCallNumber(row);\n  const storedGrainId = rowGrainIdText(row) || grainIdHint || '';\n  console.log(`Reusing existing Call Agendas row \"${rowCallTitle(row)}\" via ${source}. Has transcript: ${!!transcriptUrl}. ${fallbackCandidates.length} fallback(s) available.`);\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      agenda_row_id: row.id,\n      transcript_doc_url: transcriptUrl,\n      call_title: rowCallTitle(row) || 'Untitled Call',\n      latest_grain_call_id: storedGrainId,\n      latest_grain_call_date: rowCallDate(row),\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : (existingNum || nextCallNumber),\n      use_existing_transcript: !!transcriptUrl,\n      used_prev_week: false,\n      selection_source: source,\n      fallback_candidates: fallbackCandidates\n    }\n  }];\n}\n\nfunction emitGrainPick(pick, existing, sourceLabel, fallbackCandidates) {\n  const pickedDate = pickRecordingDate(pick);\n  console.log(`${sourceLabel} pick: id=${pick.id}, title=\"${pick.title || ''}\", date=${pickedDate}, duration_sec=${recordingDurationSec(pick)}, ${fallbackCandidates.length} fallback(s).`);\n  return [{\n    json: {\n      ...contextData, abort: false,\n      client_name: clientName, call_sign: callSign,\n      batch_date: preprocess.batch_date || contextData.batch_date || '',\n      latest_grain_call_id: pick.id,\n      latest_grain_call_title: pick.title || '',\n      latest_grain_call_date: pickedDate,\n      new_call_number: callNumberOverride > 0 ? callNumberOverride : nextCallNumber,\n      existing_agenda_row_id: existing ? existing.id : null,\n      use_existing_transcript: false,\n      used_prev_week: false,\n      selection_source: sourceLabel,\n      fallback_candidates: fallbackCandidates\n    }\n  }];\n}\n\n// Path 1: Notes override\nconst notesGrainId = preprocess.specific_call_ref?.type === 'grain_url' ? preprocess.specific_call_ref.grain_recording_id : null;\nconst dashboardGrainId = contextData.grain_recording_id || '';\nconst overrideRecordingId = notesGrainId || dashboardGrainId;\n\nif (overrideRecordingId) {\n  // For explicit override, no fallbacks — the user picked this specific call.\n  const existing = findRowByGrainId(overrideRecordingId);\n  if (existing && rowTranscriptUrl(existing)) return reuseExistingRow(existing, overrideRecordingId, 'notes_override_matched_existing', []);\n  const specificRec = allRecordings.find(r => r.id === overrideRecordingId);\n  if (specificRec) return emitGrainPick(specificRec, existing, 'notes_override', []);\n  return [{ json: { ...contextData, abort: false, client_name: clientName, call_sign: callSign,\n    batch_date: preprocess.batch_date || contextData.batch_date || '',\n    latest_grain_call_id: overrideRecordingId, latest_grain_call_title: 'Recording ' + overrideRecordingId, latest_grain_call_date: '',\n    new_call_number: callNumberOverride > 0 ? callNumberOverride : nextCallNumber,\n    existing_agenda_row_id: existing ? existing.id : null,\n    use_existing_transcript: false, used_prev_week: false, selection_source: 'notes_override_id_only',\n    fallback_candidates: [] } }];\n}\n\n// Path 2: Most recent substantive client call\nif (!primaryEmail && !secondaryEmail) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true, abort_reason: 'No Primary Email or Secondary Email set on ' + clientName + \"'s Notion page.\" } }];\n}\nif (allRecordings.length === 0) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true, abort_reason: 'Grain returned 0 recordings.' } }];\n}\n\nconst targetEmails = [primaryEmail, secondaryEmail].filter(Boolean);\nfunction recordingHasClient(r) {\n  const parts = r.participants || r.participant_list || [];\n  return parts.some(p => { const email = (p?.email || '').toLowerCase().trim(); return email && targetEmails.includes(email); });\n}\n\nconst candidateClientCalls = allRecordings.filter(recordingHasClient);\nconst substantiveClientCalls = candidateClientCalls.filter(r => {\n  const d = recordingDurationSec(r);\n  if (d > 0 && d < MIN_DURATION_SEC) {\n    console.log(`Skipping dud call ${r.id} (${r.title || ''}) — duration ${d}s < ${MIN_DURATION_SEC}s.`);\n    return false;\n  }\n  return true;\n});\nconsole.log(`Client calls (email match): ${candidateClientCalls.length}, after dud filter: ${substantiveClientCalls.length}.`);\n\nif (substantiveClientCalls.length === 0) {\n  return [{ json: { ...contextData, client_name: clientName, call_sign: callSign,\n    abort: true,\n    abort_reason: 'No substantive client calls found in Grain for ' + clientName + ' (all under ' + MIN_DURATION_SEC + 's).' } }];\n}\n\nconst sortedByDateDesc = [...substantiveClientCalls].sort((a, b) =>\n  new Date(pickRecordingDate(b) || 0) - new Date(pickRecordingDate(a) || 0)\n);\n\nconst pick = sortedByDateDesc[0];\nlet fallbacks = buildFallbackList(candidateClientCalls, pick.id);\nconsole.log('Fallback list from email-matched calls (' + fallbacks.length + '): ' +\n  fallbacks.map(f => f.id + ' [' + (f.date || '').substring(0,10) + ', ' + f.duration_sec + 's]').join(' | '));\n\n// Last resort: if there are no email-matched alternatives, widen the net to ALL recent recordings.\n// This may include internal team calls — mining will simply return 0 and we'll fall through to a clean error.\n// But it lets the workflow take a real second shot when the email field on the client page is wrong/missing.\nif (fallbacks.length === 0) {\n  fallbacks = buildFallbackList(allRecordings, pick.id);\n  console.log('No email-matched fallbacks. Widened to ALL Grain recordings (' + fallbacks.length + '): ' +\n    fallbacks.map(f => f.id + ' [' + (f.date || '').substring(0,10) + ', ' + f.duration_sec + 's]').join(' | '));\n}\nconst existing = findRowByGrainId(pick.id);\nif (existing && rowTranscriptUrl(existing)) return reuseExistingRow(existing, pick.id, 'most_recent_matched_existing', fallbacks);\nreturn emitGrainPick(pick, existing, 'most_recent', fallbacks);\n"
       },
       "id": "e955718b-03b3-434d-89a5-4dd34ba599c4",
       "name": "Cross-check Dates and Determine Call Number",
@@ -732,7 +732,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Prepare Mine Ideas Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const emptyMatch = text.match(/\\[\\s*\\]/);\n  if (emptyMatch) { try { return JSON.parse(emptyMatch[0]); } catch (_) {} }\n  const start = text.indexOf('[');\n  if (start === -1) return null;\n  const lastClose = text.lastIndexOf('}');\n  if (lastClose <= start) return null;\n  try { const p = JSON.parse(text.slice(start, lastClose + 1) + ']'); if (Array.isArray(p)) return p; } catch (e) {\n    const prev = text.lastIndexOf('}', lastClose - 1);\n    if (prev > start) { try { const p2 = JSON.parse(text.slice(start, prev + 1) + ']'); if (Array.isArray(p2)) return p2; } catch (_) {} }\n  }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (ideas === null) {\n  throw new Error('Failed to parse ideas from Claude (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\n}\n\n// Empty case is no longer a hard error here — it routes to the fallback chain via IF Mine Ideas Empty.\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  console.log('Claude returned 0 ideas — routing to one-shot fallback chain.');\n  return [{ json: { ...ctx, is_empty: true, raw_ideas: [], format_names_needed: [], claude_stop_reason: stopReason } }];\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nreturn [{ json: { ...ctx, is_empty: false, raw_ideas: ideas, format_names_needed: allFormatNames } }];\n"
+        "jsCode": "const ctx = $('Prepare Mine Ideas Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const emptyMatch = text.match(/\\[\\s*\\]/);\n  if (emptyMatch) { try { return JSON.parse(emptyMatch[0]); } catch (_) {} }\n  const start = text.indexOf('[');\n  if (start === -1) return null;\n  const lastClose = text.lastIndexOf('}');\n  if (lastClose <= start) return null;\n  try { const p = JSON.parse(text.slice(start, lastClose + 1) + ']'); if (Array.isArray(p)) return p; } catch (e) {\n    const prev = text.lastIndexOf('}', lastClose - 1);\n    if (prev > start) { try { const p2 = JSON.parse(text.slice(start, prev + 1) + ']'); if (Array.isArray(p2)) return p2; } catch (_) {} }\n  }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (ideas === null) {\n  throw new Error('Failed to parse ideas from Claude (stop_reason=' + stopReason + '). Response (first 800 chars): ' + content.substring(0, 800));\n}\n\n// Phase 1a: no fallback chain. If Claude returns 0 ideas, fail cleanly so the strategist\n// knows to pick a different call and re-submit.\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  throw new Error('Mine Ideas returned 0 ideas from the explicit call transcript provided. The call may not have substantive content for ideation. Pick a different Grain recording and re-submit. (stop_reason=' + stopReason + ')');\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nreturn [{ json: { ...ctx, is_empty: false, raw_ideas: ideas, format_names_needed: allFormatNames } }];\n"
       },
       "id": "8a2b1d7c-318c-451f-a98b-ea44feeacd95",
       "name": "Parse Ideas and Extract Format Names",
@@ -784,7 +784,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Pick the parse-node output that actually has ideas. When the primary Mine returned empty\n// the workflow ran through Parse Ideas (Fallback), so we must read from there - not the empty primary.\nfunction safeRef(nodeName) {\n  try { return $(nodeName).first().json; } catch (_) { return null; }\n}\nconst primaryCtx  = safeRef('Parse Ideas and Extract Format Names') || {};\nconst fallbackCtx = safeRef('Parse Ideas (Fallback)') || {};\nconst primaryHasIdeas  = Array.isArray(primaryCtx.raw_ideas)  && primaryCtx.raw_ideas.length  > 0;\nconst fallbackHasIdeas = Array.isArray(fallbackCtx.raw_ideas) && fallbackCtx.raw_ideas.length > 0;\nconst ctx = fallbackHasIdeas ? fallbackCtx : primaryCtx;\nconsole.log(`Prepare Finalize ctx source: ${fallbackHasIdeas ? 'Parse Ideas (Fallback)' : 'Parse Ideas (primary)'} (primary_has=${primaryHasIdeas}, fallback_has=${fallbackHasIdeas})`);\nconst formatExamples = $('Query Format Bank Pass 2 Examples').first().json;\n\nconst examplesMap = {};\n(formatExamples.results || []).forEach(page => {\n  const p = page.properties || {};\n  const name = p['Format Name']?.title?.[0]?.plain_text || '';\n  if (name) {\n    examplesMap[name] = {\n      name,\n      description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n      when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n      platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter',\n      example_1: p['Example 1']?.rich_text?.[0]?.plain_text || '',\n      example_2: p['Example 2']?.rich_text?.[0]?.plain_text || '',\n      example_3: p['Example 3']?.rich_text?.[0]?.plain_text || ''\n    };\n  }\n});\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\nYOU ARE: ${ctx.am_name || '(strategist / AM)'} - write all sources/notes from your perspective. The client is \"you\"; you are \"I\".\\nBATCH: ${ctx.total_posts_per_batch} posts - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}\\n\\nCADENCE TARGETS (final distribution must match these counts):\\n- shared (Platform: LinkedIn & X/Twitter): ${ctx.shared_count || 0}\\n- linkedin_only: ${ctx.linkedin_only_count || 0}\\n- x_only: ${ctx.x_only_count || 0}\\n- buffer (any platform): ${ctx.buffer_count || 3}\\n- effective_quota total: ${ctx.effective_quota || 0}\\n\\nWRITER'S NOTES: ${ctx.notes_for_ai || 'None'}\\n\\nFORMAT EXAMPLES:\\n${JSON.stringify(examplesMap, null, 2)}\\n\\nIDEAS TO FINALIZE:\\n${JSON.stringify(ctx.raw_ideas, null, 2)}\\n\\nFor each idea: review examples, confirm or upgrade the format, assign final platform, run quality checklist. Remove ideas that fail and cannot be fixed.\\n\\nReturn ONLY valid JSON array. Each element:\\n{\\n  \"idea\": \"client-facing row title — combine format descriptor + topic + unique angle as a content pitch note. NEVER start with the client's name (e.g. never 'Bobby said...' or 'I...' — write it like a briefing note). Examples: 'Contrarian belief post about how founders over-analyse angry customers', 'Expanded listicle on the eight UIs that changed how I think about design and why', 'Short-form take on why playing it safe with content is the fastest way to become forgettable'.\",\\n  \"topic\": \"plus or minus 5 words\",\\n  \"one_of_one_opinion\": \"unique take\",\\n  \"content_pillar\": \"exact pillar name\",\\n  \"format\": \"exact format name from Format Bank\",\\n  \"platform\": \"LinkedIn or X/Twitter\",\\n  \"sources\": \"direct quotes from transcript plus explanation of why this works\",\\n  \"notes_for_reviewer\": \"AI flags for human reviewer, empty string if none\",\\n  \"passes_checklist\": true or false,\\n  \"checklist_issues\": \"describe issues if false, empty string if true\"\\n}`;\n\nreturn [{ json: { ...ctx, examples_map: examplesMap, finalize_user_prompt: userPrompt } }];"
+        "jsCode": "// Phase 1a: single explicit call, no fallback chain. Parse Ideas is the only source.\nconst ctx = $('Parse Ideas and Extract Format Names').first().json;\nconst formatExamples = $('Query Format Bank Pass 2 Examples').first().json;\n\nconst examplesMap = {};\n(formatExamples.results || []).forEach(page => {\n  const p = page.properties || {};\n  const name = p['Format Name']?.title?.[0]?.plain_text || '';\n  if (name) {\n    examplesMap[name] = {\n      name,\n      description: p['Format Description']?.rich_text?.[0]?.plain_text || '',\n      when_to_use: p['When To Use It']?.rich_text?.[0]?.plain_text || '',\n      platform: p['Platform']?.select?.name || 'LinkedIn & X/Twitter',\n      example_1: p['Example 1']?.rich_text?.[0]?.plain_text || '',\n      example_2: p['Example 2']?.rich_text?.[0]?.plain_text || '',\n      example_3: p['Example 3']?.rich_text?.[0]?.plain_text || ''\n    };\n  }\n});\n\nconst userPrompt = `CLIENT: ${ctx.client_name}\\nYOU ARE: ${ctx.am_name || '(strategist / AM)'} - write all sources/notes from your perspective. The client is \"you\"; you are \"I\".\\nBATCH: ${ctx.total_posts_per_batch} posts - LinkedIn: ${ctx.linkedin_posts}, X/Twitter: ${ctx.x_posts}\\n\\nCADENCE TARGETS (final distribution must match these counts):\\n- shared (Platform: LinkedIn & X/Twitter): ${ctx.shared_count || 0}\\n- linkedin_only: ${ctx.linkedin_only_count || 0}\\n- x_only: ${ctx.x_only_count || 0}\\n- buffer (any platform): ${ctx.buffer_count || 3}\\n- effective_quota total: ${ctx.effective_quota || 0}\\n\\nWRITER'S NOTES: ${ctx.notes_for_ai || 'None'}\\n\\nFORMAT EXAMPLES:\\n${JSON.stringify(examplesMap, null, 2)}\\n\\nIDEAS TO FINALIZE:\\n${JSON.stringify(ctx.raw_ideas, null, 2)}\\n\\nFor each idea: review examples, confirm or upgrade the format, assign final platform, run quality checklist. Remove ideas that fail and cannot be fixed.\\n\\nReturn ONLY valid JSON array. Each element:\\n{\\n  \"idea\": \"client-facing row title — combine format descriptor + topic + unique angle as a content pitch note. NEVER start with the client's name (e.g. never 'Bobby said...' or 'I...' — write it like a briefing note). Examples: 'Contrarian belief post about how founders over-analyse angry customers', 'Expanded listicle on the eight UIs that changed how I think about design and why', 'Short-form take on why playing it safe with content is the fastest way to become forgettable'.\",\\n  \"topic\": \"plus or minus 5 words\",\\n  \"one_of_one_opinion\": \"unique take\",\\n  \"content_pillar\": \"exact pillar name\",\\n  \"format\": \"exact format name from Format Bank\",\\n  \"platform\": \"LinkedIn or X/Twitter\",\\n  \"sources\": \"direct quotes from transcript plus explanation of why this works\",\\n  \"notes_for_reviewer\": \"AI flags for human reviewer, empty string if none\",\\n  \"passes_checklist\": true or false,\\n  \"checklist_issues\": \"describe issues if false, empty string if true\"\\n}`;\n\nreturn [{ json: { ...ctx, examples_map: examplesMap, finalize_user_prompt: userPrompt } }];"
       },
       "id": "53c6a4ff-155a-4f55-afd9-5e67f1eb8b63",
       "name": "Prepare Finalize Ideas Context",
@@ -2247,161 +2247,6 @@
       }
     },
     {
-      "id": "fallback-mine-0001-4000-8000-000000000001",
-      "name": "IF Mine Ideas Empty",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        180164,
-        44784
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "is_empty_true",
-              "leftValue": "={{ $json.is_empty }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "fallback-mine-0001-4000-8000-000000000002",
-      "name": "Pick Fallback Call",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        180384,
-        45034
-      ],
-      "parameters": {
-        "jsCode": "// Pick the first fallback candidate (next-most-recent substantive call).\n// If no fallbacks were prepared (e.g., notes override), throw — there's nothing to retry with.\nconst ctx = $input.first().json;\nconst fallbacks = ctx.fallback_candidates || [];\nif (fallbacks.length === 0) {\n  throw new Error('No fallback candidates available. The primary call yielded 0 ideas and there is no alternative call to try. (Notes override paths bypass fallback by design.)');\n}\nconst next = fallbacks[0];\nconsole.log(`Fallback call: id=${next.id}, title=\"${next.title}\", date=${next.date}, duration_sec=${next.duration_sec}.`);\nreturn [{\n  json: {\n    ...ctx,\n    is_empty: false,\n    fallback_grain_call_id: next.id,\n    fallback_call_title: next.title,\n    fallback_call_date: next.date\n  }\n}];\n"
-      }
-    },
-    {
-      "id": "fallback-mine-0001-4000-8000-000000000003",
-      "name": "Fetch Fallback Grain Transcript",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        180604,
-        45034
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.grain.com/_/public-api/v2/recordings/' + $json.fallback_grain_call_id + '/transcript.txt' }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Public-Api-Version",
-              "value": "2025-10-31"
-            }
-          ]
-        },
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "text",
-              "outputPropertyName": "data"
-            }
-          }
-        }
-      },
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "2xe5Fu89Y7JRKtxW",
-          "name": "Grain API"
-        }
-      },
-      "continueOnFail": true
-    },
-    {
-      "id": "fallback-mine-0001-4000-8000-000000000004",
-      "name": "Build Fallback Mine Context",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        180824,
-        45034
-      ],
-      "parameters": {
-        "jsCode": "const pick = $('Pick Fallback Call').first().json;\nconst refetch = $input.first().json;\nconst fetchFailed = !!refetch?.error || !!refetch?.code;\nconst transcript = fetchFailed ? '' : (refetch?.data || '').trim();\n\nif (!transcript) {\n  throw new Error('Fallback Grain transcript fetch returned empty for recording ' + pick.fallback_grain_call_id + '. No more retries available.');\n}\n\nconst formatList = pick.format_list || [];\n\nconst cadenceBlock = `CADENCE BREAKDOWN:\n- shared_count: ${pick.shared_count || 0}\n- linkedin_only_count: ${pick.linkedin_only_count || 0}\n- x_only_count: ${pick.x_only_count || 0}\n- buffer: ${pick.buffer_count || 3}\n- effective_quota total: ${pick.effective_quota || pick.transcript_idea_quota || 0}`;\n\nconst userPrompt = `CLIENT: ${pick.client_name}\\nYOU ARE: ${pick.am_name || '(strategist / AM)'} - write all sources/notes from your perspective. The client is \"you\"; you are \"I\".\\n\\nINTELLIGENCE BRIEF:\\n${pick.intel_brief_text}\\n\\nCONTENT STRATEGY (${pick.total_posts_per_batch} posts total - LinkedIn: ${pick.linkedin_posts}, X/Twitter: ${pick.x_posts}):\\n${pick.strategy_doc_text}\\n\\nWRITER'S NOTES FOR THIS BATCH:\\n${pick.notes_for_ai || 'None'}\\n\\nCALL: ${pick.fallback_call_title || 'Fallback call'} (FALLBACK - primary call yielded no ideas)\\n\\nFULL TRANSCRIPT:\\n${transcript}\\n\\n---\\n${cadenceBlock}\\n\\n---\\nFORMAT BANK (name | description | when to use | platform):\\n${formatList.map(f => `- ${f.name} | ${f.description} | ${f.when_to_use} | ${f.platform}`).join('\\n')}\\n\\n---\\nIMPORTANT: This is the fallback attempt because the most recent call did not produce ideas. Mine this transcript thoroughly. For sources and notes_for_reviewer, use 1st person voice (strategist writing for the client). Cite the CALL name \"${pick.fallback_call_title || 'this fallback call'}\".\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown. Each element:\\n{\\n  \"topic\": \"one word, two words, or one line\",\\n  \"one_of_one_opinion\": \"the unique take only this client can have\",\\n  \"content_pillar\": \"exact pillar name from the strategy doc\",\\n  \"transcript_source\": \"1st person note citing the call name + quote/moment + context\",\\n  \"format_candidates\": [\"Format Name 1\", \"Format Name 2\", \"Format Name 3\"],\\n  \"platform_lean\": \"LinkedIn or X/Twitter or LinkedIn & X/Twitter\",\\n  \"notes_for_reviewer\": \"1st person note for the human reviewer, empty string if none\"\\n}`;\n\nconsole.log(`Fallback transcript fetched (${transcript.length} chars). Ready for Mine Ideas (Fallback).`);\nreturn [{ json: {\n  ...pick,\n  transcript_text: transcript,\n  mine_ideas_user_prompt: userPrompt,\n  used_fallback: true\n} }];\n"
-      }
-    },
-    {
-      "id": "fallback-mine-0001-4000-8000-000000000005",
-      "name": "Mine Ideas Claude (Fallback)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        181044,
-        45034
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-7', max_tokens: 16000, system: 'You are an expert content strategist mining one-of-one content ideas from a client call transcript. The output goes straight to a writer + the client - it should read like notes a thoughtful strategist took for them.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC - one word, two words, or one line\\n2. FORMAT - a format from the Format Bank\\n3. 1-OF-1 OPINION - the unique take only this client can have\\n\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—) or en dashes (–). Use comma, semicolon, period, hyphen, or rewrite.\\n\\nWHO IS SPEAKING:\\nThe transcript has multiple speakers. The CLIENT is the person who hired the agency (they read the output - address them as \"you\"). The STRATEGIST / AM is the agency rep on the call - their name is given in the prompt; YOU write as if you are this person. Other team members may also be on the call.\\n\\nWHAT TO MINE vs WHAT TO SKIP (CRITICAL):\\n\\n(A) IRRELEVANT - DO NOT MINE.\\n- Small talk, pleasantries, scheduling, logistics\\n- Operational arrangements (\"let\\'s do Monday 9am kickoffs\", \"I\\'ll send the doc Friday\")\\n- Internal process notes (recording cadence, handoffs, review timing)\\n- Meta-workflow chatter (\"makes it feel less heavy\", \"this is going to be smoother\")\\n- Agency-client relationship, billing, deliverables process\\nLogistics is never an idea. If a moment is about HOW the work gets done, not WHAT to post about, skip it entirely.\\n\\n(B) ALREADY-DISCUSSED IDEAS - DO NOT MINE.\\n- \"Here is the post we wrote about X\"\\n- \"We\\'re thinking of a carousel on Y, thoughts?\"\\n- \"This is the draft we sent over\"\\n- \"In the last batch, we had...\"\\nThe strategist is gathering context for existing pipeline content. Don\\'t re-mine.\\n\\nNUANCE: if the client adds a net-new angle on top of an already-discussed idea, mine the net-new piece only.\\n\\n(C) FRESH SUBSTANCE - MINE THIS.\\n- Fresh stories the client tells\\n- Strong opinions the client expresses\\n- Unique experiences, numbers, turning points\\n- Reactions to news/events the client cares about\\n- Beliefs against the grain\\n- Specific moments where the client teaches something\\nTest: \"would the client\\'s audience find this valuable on its own as a post?\"\\n\\nWhen unsure: lean toward skipping. False positives waste a slot.\\n\\nPREVIOUS BATCH (if provided):\\nAvoid near-duplicates of Approved/Scheduled/Posted ideas. Avoid Scratched angles. Informational only.\\n\\nCADENCE-AWARE IDEATION (STRICT):\\nThe user prompt gives target counts: shared_count, linkedin_only_count, x_only_count, buffer. Hit these exactly. If a count is 0, do NOT produce ideas in that bucket. Platform is driven by the format you pick (each Format Bank entry has a Platform field).\\n\\nFORMAT-CADENCE CONFLICT: if an idea\\'s natural format would overflow a filled or zero-count bucket, pick the next-best compatible format for an unfilled bucket. Skip only as last resort.\\n\\nVOICE - WHO IS WHO (READ TWICE):\\n\\nYou ARE the strategist/AM. The user prompt will name them in a \"YOU ARE:\" line (e.g. \"YOU ARE: Mel\"). Internalize that name as YOU before writing anything.\\n\\nWhen the transcript shows speaker labels (e.g. \"Mel:\", \"Bobby:\", \"Thomas:\"):\\n1. The speaker whose name MATCHES the AM in \"YOU ARE:\" -> rewrite as \"I\". Never use their name in third person. e.g. if YOU ARE Mel and the transcript says \"Mel: I think you should X\", write \"I told you you should X\" or \"I said X\". NOT \"Mel said X\". NOT \"Mel brought up X\".\\n2. The CLIENT (the person this batch is FOR) -> \"you\" / \"you said\" / \"you mentioned\". Always.\\n3. ANY OTHER named speaker (a colleague who\\'s not the AM, e.g. Thomas in a 3-person call) -> use their name as given. e.g. \"Thomas pushed back and you said X\".\\n4. If unattributed or unclear -> default to \"you\" (the client).\\n\\nEXAMPLE (assume YOU ARE: Mel, CLIENT: Bobby):\\n- BAD: \"After Mel\\'s earthquake scare you told this story...\" (Mel is YOU — write 1st person)\\n- GOOD: \"After my earthquake scare you told this story...\"\\n- BAD: \"Mel said it puts things in perspective.\"\\n- GOOD: \"I said it puts things in perspective.\"\\n- BAD: \"When Thomas pushed for the angle on testosterone, you said...\" (Thomas is not the AM — keep his name)\\n- GOOD: \"When Thomas pushed for the angle on testosterone, you said...\" (unchanged - Thomas is fine to name)\\n\\nThis is the most important voice rule. Get it wrong and the notes feel robotic. Get it right and the client feels like a human wrote it for them.\\n\\nSOURCE STYLE - VARY THE OPENING, DON\\'T USE A TEMPLATE:\\nDo NOT start every bullet with \"On the call you said...\" That\\'s a formula and it shows.\\nMix natural openings across the batch, drawing from variations like:\\n- \"When I asked about X, you said \\\\\"...\\\\\"\"\\n- \"You walked me through how X works...\"\\n- \"Halfway through you brought up...\"\\n- \"You closed with: \\\\\"...\\\\\". That\\'s the angle.\"\\n- \"I shared X and you responded \\\\\"...\\\\\"\"\\n- \"Quick story you told - about how...\"\\n- \"You got fired up when I mentioned X...\"\\n- \"Thomas pushed back and you said...\"\\n- \"After my [thing] you launched into...\"\\n\\nReference the call as \"the call\" or \"our call\" - never the full call title.\\n\\nSources are bullet style, mandatory (every idea has at least one). Each bullet on its own line starting with \"- \" (hyphen + space). Include direct quotes, data points, references, links, and a brief why-this-works sentence as needed.\\n\\nNotes are FLAGS for the human reviewer, optional. Empty string when nothing to flag.\\n\\nQUALITY GOAL - each idea should:\\n1. Clear topic\\n2. Format from Format Bank\\n3. Real 1-of-1 opinion\\n4. Connect to a content pillar from the strategy doc\\n5. Pass the 365-day test\\n\\nCONTENT PILLAR RULES:\\nEvery idea ties to a content pillar. Miscellaneous only if explicitly defined and used sparingly.\\n\\nANTI-HALLUCINATION:\\nEvery idea traces to a real moment that passes (C). No invented conclusions, no merged thoughts.\\n\\nVOLUME: hit effective_quota if the call has substance. If genuinely lean on bucket-C material, return fewer. Don\\'t return zero unless truly no bucket-C moments.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown.', messages: [{ role: 'user', content: $json.mine_ideas_user_prompt }] }) }}"
-      },
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "4T8Kci2Im6elVzo2",
-          "name": "Anthropic API Key"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 10000,
-      "continueOnFail": true,
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "fallback-mine-0001-4000-8000-000000000006",
-      "name": "Parse Ideas (Fallback)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        181264,
-        45034
-      ],
-      "parameters": {
-        "jsCode": "const ctx = $('Build Fallback Mine Context').first().json;\nconst resp = $input.first().json;\nconst content = resp.content?.[0]?.text || '';\nconst stopReason = resp.stop_reason || '';\n\nfunction stripDashes(s) { return typeof s === 'string' ? s.replace(/[—–]/g, '-') : s; }\nfunction deepStripDashes(obj) {\n  if (typeof obj === 'string') return stripDashes(obj);\n  if (Array.isArray(obj)) return obj.map(deepStripDashes);\n  if (obj && typeof obj === 'object') { const o = {}; for (const k of Object.keys(obj)) o[k] = deepStripDashes(obj[k]); return o; }\n  return obj;\n}\n\nfunction parseIdeasArray(text) {\n  const m = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }\n  const emptyMatch = text.match(/\\[\\s*\\]/);\n  if (emptyMatch) { try { return JSON.parse(emptyMatch[0]); } catch (_) {} }\n  return null;\n}\n\nlet ideas = parseIdeasArray(content);\nif (ideas === null) throw new Error('Fallback Mine: failed to parse Claude response (stop_reason=' + stopReason + '). Response: ' + content.substring(0, 800));\nif (!Array.isArray(ideas) || ideas.length === 0) {\n  throw new Error('Fallback Mine also returned 0 ideas. Both the most recent call and the next-most-recent call yielded no mineable content for ' + (ctx.client_name || 'this client') + '. Manually pick a Grain URL via Notes for AI and re-submit.');\n}\n\nideas = deepStripDashes(ideas);\nconst allFormatNames = [...new Set(ideas.flatMap(i => i.format_candidates || []))];\nconsole.log(`Fallback Mine succeeded with ${ideas.length} idea(s).`);\nreturn [{ json: { ...ctx, raw_ideas: ideas, format_names_needed: allFormatNames, is_empty: false } }];\n"
-      }
-    },
-    {
       "id": "hooks-chain-0001-4000-8000-000000000001",
       "name": "Query Hook Bank",
       "type": "n8n-nodes-base.httpRequest",
@@ -2584,80 +2429,6 @@
       }
     },
     {
-      "id": "fallback-claude-8218842fcc0e4900bee19669",
-      "name": "IF Mine Ideas Claude (Fallback) OK",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        181264,
-        45034
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "claude_response_succeeded",
-              "leftValue": "={{ $json.type }}",
-              "rightValue": "message",
-              "operator": {
-                "type": "string",
-                "operation": "equals",
-                "caseSensitive": false
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "fallback-claude-40b5f9f18c0e489699e8a902",
-      "name": "Mine Ideas Claude (Fallback) (Opus 4.6 Fallback)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        181484,
-        45194
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-6', max_tokens: 16000, system: 'You are an expert content strategist mining one-of-one content ideas from a client call transcript. The output goes straight to a writer + the client - it should read like notes a thoughtful strategist took for them.\\n\\nAN IDEA IS EXACTLY 3 PARTS:\\n1. TOPIC - one word, two words, or one line\\n2. FORMAT - a format from the Format Bank\\n3. 1-OF-1 OPINION - the unique take only this client can have\\n\\nFORMATTING RULES (hard):\\n- NEVER use em dashes (—) or en dashes (–). Use comma, semicolon, period, hyphen, or rewrite.\\n\\nWHO IS SPEAKING:\\nThe transcript has multiple speakers. The CLIENT is the person who hired the agency (they read the output - address them as \"you\"). The STRATEGIST / AM is the agency rep on the call - their name is given in the prompt; YOU write as if you are this person. Other team members may also be on the call.\\n\\nWHAT TO MINE vs WHAT TO SKIP (CRITICAL):\\n\\n(A) IRRELEVANT - DO NOT MINE.\\n- Small talk, pleasantries, scheduling, logistics\\n- Operational arrangements (\"let\\'s do Monday 9am kickoffs\", \"I\\'ll send the doc Friday\")\\n- Internal process notes (recording cadence, handoffs, review timing)\\n- Meta-workflow chatter (\"makes it feel less heavy\", \"this is going to be smoother\")\\n- Agency-client relationship, billing, deliverables process\\nLogistics is never an idea. If a moment is about HOW the work gets done, not WHAT to post about, skip it entirely.\\n\\n(B) ALREADY-DISCUSSED IDEAS - DO NOT MINE.\\n- \"Here is the post we wrote about X\"\\n- \"We\\'re thinking of a carousel on Y, thoughts?\"\\n- \"This is the draft we sent over\"\\n- \"In the last batch, we had...\"\\nThe strategist is gathering context for existing pipeline content. Don\\'t re-mine.\\n\\nNUANCE: if the client adds a net-new angle on top of an already-discussed idea, mine the net-new piece only.\\n\\n(C) FRESH SUBSTANCE - MINE THIS.\\n- Fresh stories the client tells\\n- Strong opinions the client expresses\\n- Unique experiences, numbers, turning points\\n- Reactions to news/events the client cares about\\n- Beliefs against the grain\\n- Specific moments where the client teaches something\\nTest: \"would the client\\'s audience find this valuable on its own as a post?\"\\n\\nWhen unsure: lean toward skipping. False positives waste a slot.\\n\\nPREVIOUS BATCH (if provided):\\nAvoid near-duplicates of Approved/Scheduled/Posted ideas. Avoid Scratched angles. Informational only.\\n\\nCADENCE-AWARE IDEATION (STRICT):\\nThe user prompt gives target counts: shared_count, linkedin_only_count, x_only_count, buffer. Hit these exactly. If a count is 0, do NOT produce ideas in that bucket. Platform is driven by the format you pick (each Format Bank entry has a Platform field).\\n\\nFORMAT-CADENCE CONFLICT: if an idea\\'s natural format would overflow a filled or zero-count bucket, pick the next-best compatible format for an unfilled bucket. Skip only as last resort.\\n\\nVOICE - WHO IS WHO (READ TWICE):\\n\\nYou ARE the strategist/AM. The user prompt will name them in a \"YOU ARE:\" line (e.g. \"YOU ARE: Mel\"). Internalize that name as YOU before writing anything.\\n\\nWhen the transcript shows speaker labels (e.g. \"Mel:\", \"Bobby:\", \"Thomas:\"):\\n1. The speaker whose name MATCHES the AM in \"YOU ARE:\" -> rewrite as \"I\". Never use their name in third person. e.g. if YOU ARE Mel and the transcript says \"Mel: I think you should X\", write \"I told you you should X\" or \"I said X\". NOT \"Mel said X\". NOT \"Mel brought up X\".\\n2. The CLIENT (the person this batch is FOR) -> \"you\" / \"you said\" / \"you mentioned\". Always.\\n3. ANY OTHER named speaker (a colleague who\\'s not the AM, e.g. Thomas in a 3-person call) -> use their name as given. e.g. \"Thomas pushed back and you said X\".\\n4. If unattributed or unclear -> default to \"you\" (the client).\\n\\nEXAMPLE (assume YOU ARE: Mel, CLIENT: Bobby):\\n- BAD: \"After Mel\\'s earthquake scare you told this story...\" (Mel is YOU — write 1st person)\\n- GOOD: \"After my earthquake scare you told this story...\"\\n- BAD: \"Mel said it puts things in perspective.\"\\n- GOOD: \"I said it puts things in perspective.\"\\n- BAD: \"When Thomas pushed for the angle on testosterone, you said...\" (Thomas is not the AM — keep his name)\\n- GOOD: \"When Thomas pushed for the angle on testosterone, you said...\" (unchanged - Thomas is fine to name)\\n\\nThis is the most important voice rule. Get it wrong and the notes feel robotic. Get it right and the client feels like a human wrote it for them.\\n\\nSOURCE STYLE - VARY THE OPENING, DON\\'T USE A TEMPLATE:\\nDo NOT start every bullet with \"On the call you said...\" That\\'s a formula and it shows.\\nMix natural openings across the batch, drawing from variations like:\\n- \"When I asked about X, you said \\\\\"...\\\\\"\"\\n- \"You walked me through how X works...\"\\n- \"Halfway through you brought up...\"\\n- \"You closed with: \\\\\"...\\\\\". That\\'s the angle.\"\\n- \"I shared X and you responded \\\\\"...\\\\\"\"\\n- \"Quick story you told - about how...\"\\n- \"You got fired up when I mentioned X...\"\\n- \"Thomas pushed back and you said...\"\\n- \"After my [thing] you launched into...\"\\n\\nReference the call as \"the call\" or \"our call\" - never the full call title.\\n\\nSources are bullet style, mandatory (every idea has at least one). Each bullet on its own line starting with \"- \" (hyphen + space). Include direct quotes, data points, references, links, and a brief why-this-works sentence as needed.\\n\\nNotes are FLAGS for the human reviewer, optional. Empty string when nothing to flag.\\n\\nQUALITY GOAL - each idea should:\\n1. Clear topic\\n2. Format from Format Bank\\n3. Real 1-of-1 opinion\\n4. Connect to a content pillar from the strategy doc\\n5. Pass the 365-day test\\n\\nCONTENT PILLAR RULES:\\nEvery idea ties to a content pillar. Miscellaneous only if explicitly defined and used sparingly.\\n\\nANTI-HALLUCINATION:\\nEvery idea traces to a real moment that passes (C). No invented conclusions, no merged thoughts.\\n\\nVOLUME: hit effective_quota if the call has substance. If genuinely lean on bucket-C material, return fewer. Don\\'t return zero unless truly no bucket-C moments.\\n\\nReturn ONLY a valid JSON array. No preamble, no markdown.', messages: [{ role: 'user', content: $('Build Fallback Mine Context').first().json.mine_ideas_user_prompt }] }) }}"
-      },
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "4T8Kci2Im6elVzo2",
-          "name": "Anthropic API Key"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 5,
-      "waitBetweenTries": 15000
-    },
-    {
       "id": "fallback-claude-1f38a165fd03476bb081f948",
       "name": "IF Finalize Ideas Claude OK",
       "type": "n8n-nodes-base.if",
@@ -2805,75 +2576,6 @@
       "retryOnFail": true,
       "maxTries": 5,
       "waitBetweenTries": 15000
-    },
-    {
-      "id": "prescreen-0001-4000-8000-000000000001",
-      "name": "Compile Pre-Screen Candidates",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        175044,
-        44768
-      ],
-      "parameters": {
-        "jsCode": "// Build a pre-screen candidate list = primary pick + all fallback candidates,\n// each enriched with its Summary + Topics from the Call Agendas database.\n// If summaries don't exist (new client, first batch), we still emit the candidates\n// without summaries — Claude will rank by title/date only.\n\nconst ccData      = $('Cross-check Dates and Determine Call Number').first().json;\nconst notionRows  = $('Query Call Agendas for Cross-check').first().json?.results || [];\n\nfunction plain(rich) { return (rich || []).map(t => t?.plain_text || '').join(''); }\nfunction rowGrainId(row) {\n  const props = row?.properties || {};\n  return plain(props['Grain ID']?.rich_text)\n      || plain(props['Grain Recording ID']?.rich_text)\n      || '';\n}\nfunction readRichByKeyword(row, kw) {\n  const props = row?.properties || {};\n  for (const [k, v] of Object.entries(props)) {\n    if (v?.type === 'rich_text' && k.toLowerCase().includes(kw)) {\n      const text = plain(v.rich_text);\n      if (text) return text;\n    }\n  }\n  return '';\n}\n\n// Map grain_id → { summary, topics } from existing Call Agendas rows\nconst grainToContext = new Map();\nfor (const r of notionRows) {\n  const gid = rowGrainId(r);\n  if (!gid) continue;\n  grainToContext.set(gid, {\n    summary: readRichByKeyword(r, 'summary'),\n    topics:  readRichByKeyword(r, 'topic')\n  });\n}\n\nconst primary = {\n  grain_id: ccData.latest_grain_call_id,\n  title:    ccData.latest_grain_call_title || '',\n  date:     (ccData.latest_grain_call_date || '').substring(0, 10)\n};\nconst fallbacks = (ccData.fallback_candidates || []).map(c => ({\n  grain_id: c.id,\n  title:    c.title || ('Recording ' + c.id),\n  date:     (c.date || '').substring(0, 10)\n}));\n\nconst candidates = [primary, ...fallbacks]\n  .filter(c => !!c.grain_id)\n  .map(c => ({\n    ...c,\n    summary: grainToContext.get(c.grain_id)?.summary || '',\n    topics:  grainToContext.get(c.grain_id)?.topics  || ''\n  }));\n\nconst hasAnySummary = candidates.some(c => c.summary || c.topics);\nconsole.log(`Pre-screen candidates: ${candidates.length} (with summaries: ${candidates.filter(c => c.summary || c.topics).length}). Skip pre-screen: ${!hasAnySummary || candidates.length < 2}`);\n\n// Build the user prompt for Claude\nconst candidatesBlock = candidates.map((c, i) => `Candidate ${i + 1}:\n- grain_id: ${c.grain_id}\n- title: ${c.title}\n- date: ${c.date}\n- summary: ${c.summary || '(no summary available — call may not have been processed yet)'}\n- topics: ${c.topics || '(no topics)'}`).join('\\n\\n');\n\nconst userPrompt = `You are pre-screening calls to pick the one with the most substantive content for social media content ideation.\n\nCANDIDATES (most recent first):\n${candidatesBlock}\n\nA SUBSTANTIVE call has:\n- A summary describing real stories, opinions, specific topics, decisions, or experiences the client shared\n- Multiple distinct topics tied to the client's business, industry, point of view, or audience\n- Evidence of fresh ideation, strong opinions, or unique experiences\n\nA WEAK/DUD call has:\n- Summary that's all logistics, scheduling, no-show, brief sync, internal process\n- Topics that are vague or all process/workflow-related\n- A short summary with little of substance\n\nRank from MOST substantive to LEAST. Return ONLY a JSON object with this shape:\n{\n  \"ranked_grain_ids\": [\"id-of-best\", \"id-of-second-best\", ...],\n  \"rationale\": \"one sentence per call describing why you ranked it where you did\"\n}\n\nIf a call has no summary, rank it middle-of-pack (we can't tell yet).`;\n\nreturn [{ json: {\n  ...ccData,\n  pre_screen_candidates: candidates,\n  pre_screen_skip: !hasAnySummary || candidates.length < 2,\n  pre_screen_user_prompt: userPrompt\n} }];\n"
-      }
-    },
-    {
-      "id": "prescreen-0001-4000-8000-000000000002",
-      "name": "Pre-Screen Substance Claude",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        175264,
-        44768
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, system: 'You rank call recordings by their substance for social media content ideation. Return ONLY valid JSON. No preamble, no markdown.', messages: [{ role: 'user', content: $json.pre_screen_user_prompt }] }) }}"
-      },
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "4T8Kci2Im6elVzo2",
-          "name": "Anthropic API"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 5,
-      "waitBetweenTries": 10000,
-      "continueOnFail": true,
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "prescreen-0001-4000-8000-000000000003",
-      "name": "Apply Pre-Screen Ranking",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        175484,
-        44768
-      ],
-      "parameters": {
-        "jsCode": "const compileData = $('Compile Pre-Screen Candidates').first().json;\nconst resp = $input.first().json;\nconst content = resp?.content?.[0]?.text || '';\n\nfunction passthrough(reason) {\n  console.log(`Pre-screen: keeping Cross-check primary (${reason}).`);\n  // Strip pre_screen_* working fields from output\n  const { pre_screen_candidates, pre_screen_skip, pre_screen_user_prompt, ...rest } = compileData;\n  return [{ json: rest }];\n}\n\nif (compileData.pre_screen_skip) return passthrough('skipped — no summaries available');\n\nlet ranked = [];\nlet rationale = '';\ntry {\n  const m = content.match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(m ? m[0] : content);\n  ranked = parsed.ranked_grain_ids || [];\n  rationale = parsed.rationale || '';\n} catch (e) {\n  console.log('Pre-screen: could not parse Claude response:', content.substring(0, 300));\n  return passthrough('parse error');\n}\n\nif (!ranked.length) return passthrough('empty ranked list');\n\nconst newPrimaryId = ranked[0];\nconst currentPrimaryId = compileData.latest_grain_call_id;\n\n// Re-derive fallbacks from the rest of the ranked list\nconst candidates = compileData.pre_screen_candidates || [];\nconst newFallbacks = ranked.slice(1).map(id => {\n  const c = candidates.find(cc => cc.grain_id === id);\n  if (!c) return null;\n  return { id: c.grain_id, title: c.title, date: c.date, duration_sec: 0 };\n}).filter(Boolean);\n\nif (newPrimaryId === currentPrimaryId) {\n  console.log(`Pre-screen confirmed primary pick: ${currentPrimaryId}. Rationale: ${rationale.substring(0, 200)}`);\n  const { pre_screen_candidates, pre_screen_skip, pre_screen_user_prompt, ...rest } = compileData;\n  return [{ json: { ...rest, fallback_candidates: newFallbacks, pre_screen_ranking: ranked } }];\n}\n\nconst newPrimaryCandidate = candidates.find(c => c.grain_id === newPrimaryId);\nif (!newPrimaryCandidate) return passthrough(`recommended grain_id ${newPrimaryId} not in candidate list`);\n\nconsole.log(`Pre-screen SWAP: was ${currentPrimaryId} (\"${compileData.latest_grain_call_title}\"), now ${newPrimaryId} (\"${newPrimaryCandidate.title}\"). Rationale: ${rationale.substring(0, 300)}`);\n\nconst { pre_screen_candidates, pre_screen_skip, pre_screen_user_prompt, ...rest } = compileData;\n\nreturn [{\n  json: {\n    ...rest,\n    latest_grain_call_id:    newPrimaryCandidate.grain_id,\n    latest_grain_call_title: newPrimaryCandidate.title,\n    latest_grain_call_date:  newPrimaryCandidate.date,\n    fallback_candidates:     newFallbacks,\n    pre_screen_ranking:      ranked,\n    pre_screen_swapped:      true,\n    pre_screen_rationale:    rationale\n  }\n}];\n"
-      }
     }
   ],
   "pinData": {},
@@ -2991,7 +2693,7 @@
       "main": [
         [
           {
-            "node": "Compile Pre-Screen Candidates",
+            "node": "IF Transcript Client Match",
             "type": "main",
             "index": 0
           }
@@ -3218,7 +2920,7 @@
       "main": [
         [
           {
-            "node": "IF Mine Ideas Empty",
+            "node": "Query Format Bank Pass 2 Examples",
             "type": "main",
             "index": 0
           }
@@ -3898,79 +3600,6 @@
         ]
       ]
     },
-    "IF Mine Ideas Empty": {
-      "main": [
-        [
-          {
-            "node": "Pick Fallback Call",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Query Format Bank Pass 2 Examples",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Pick Fallback Call": {
-      "main": [
-        [
-          {
-            "node": "Fetch Fallback Grain Transcript",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Fallback Grain Transcript": {
-      "main": [
-        [
-          {
-            "node": "Build Fallback Mine Context",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Fallback Mine Context": {
-      "main": [
-        [
-          {
-            "node": "Mine Ideas Claude (Fallback)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mine Ideas Claude (Fallback)": {
-      "main": [
-        [
-          {
-            "node": "IF Mine Ideas Claude (Fallback) OK",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Ideas (Fallback)": {
-      "main": [
-        [
-          {
-            "node": "Query Format Bank Pass 2 Examples",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Query Hook Bank": {
       "main": [
         [
@@ -4044,35 +3673,6 @@
         ]
       ]
     },
-    "IF Mine Ideas Claude (Fallback) OK": {
-      "main": [
-        [
-          {
-            "node": "Parse Ideas (Fallback)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mine Ideas Claude (Fallback) (Opus 4.6 Fallback)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mine Ideas Claude (Fallback) (Opus 4.6 Fallback)": {
-      "main": [
-        [
-          {
-            "node": "Parse Ideas (Fallback)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "IF Finalize Ideas Claude OK": {
       "main": [
         [
@@ -4125,39 +3725,6 @@
         [
           {
             "node": "Parse Hooks",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Compile Pre-Screen Candidates": {
-      "main": [
-        [
-          {
-            "node": "Pre-Screen Substance Claude",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Pre-Screen Substance Claude": {
-      "main": [
-        [
-          {
-            "node": "Apply Pre-Screen Ranking",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Apply Pre-Screen Ranking": {
-      "main": [
-        [
-          {
-            "node": "IF Transcript Client Match",
             "type": "main",
             "index": 0
           }
