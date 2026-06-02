@@ -2538,7 +2538,25 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "start_cursor",
+                    "value": "={{ $response.body.next_cursor }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.has_more === false }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
       },
       "credentials": {
         "notionApi": {
@@ -2557,7 +2575,7 @@
         44688
       ],
       "parameters": {
-        "jsCode": "\nconst ctx = $('Extract Client DB IDs').first().json;\nconst topBlocks = $input.first().json.results || [];\n\nconst all = $getWorkflowStaticData('global');\nall.top_blocks = topBlocks;\nall.l2_map = {};\nall.ctx = { ...ctx };  // preserve client db ids for downstream nodes\n\nconst items = [];\nfor (const b of topBlocks) {\n  if (b.has_children) items.push({ json: { block_id: b.id, skip: false } });\n}\nif (items.length === 0) items.push({ json: { block_id: 'noop', skip: true } });\n\nconsole.log('Top-level blocks:', topBlocks.length, '| has_children:', items.filter(i => !i.json.skip).length);\nreturn items;\n"
+        "jsCode": "\nconst ctx = $('Extract Client DB IDs').first().json;\n// Pagination produces one item per page — flatten all .results arrays\nconst allInputItems = $input.all();\nconst topBlocks = allInputItems.flatMap(i => (i.json && i.json.results) || []);\n\nconst all = $getWorkflowStaticData('global');\nall.top_blocks = topBlocks;\nall.l2_map = {};\nall.ctx = { ...ctx };\n\nconst items = [];\nfor (const b of topBlocks) {\n  if (b.has_children) items.push({ json: { block_id: b.id, skip: false } });\n}\nif (items.length === 0) items.push({ json: { block_id: 'noop', skip: true } });\n\nconsole.log('Top-level blocks (paginated):', topBlocks.length, '| has_children:', items.filter(i => !i.json.skip).length);\nreturn items;\n"
       }
     },
     {
@@ -2596,7 +2614,25 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "start_cursor",
+                    "value": "={{ $response.body.next_cursor }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.has_more === false }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
       },
       "credentials": {
         "notionApi": {
@@ -2617,7 +2653,7 @@
         44688
       ],
       "parameters": {
-        "jsCode": "\nconst all = $getWorkflowStaticData('global');\nall.l2_map = all.l2_map || {};\n\nconst parentItem = $('Split L1 IDs').item.json || {};\nconst parentId = parentItem.block_id;\nif (parentId && parentId !== 'noop' && !parentItem.skip) {\n  const res = $json.results;\n  if (Array.isArray(res)) {\n    all.l2_map[parentId] = res;\n  } else {\n    // 4xx/5xx — just record empty so serializer doesn't blow up\n    all.l2_map[parentId] = [];\n    console.log('L2 fetch returned no results for parent:', parentId);\n  }\n}\nreturn [{ json: { stored_parent: parentId } }];\n"
+        "jsCode": "\nconst all = $getWorkflowStaticData('global');\nall.l2_map = all.l2_map || {};\n\nconst parentItem = $('Split L1 IDs').item.json || {};\nconst parentId = parentItem.block_id;\nif (parentId && parentId !== 'noop' && !parentItem.skip) {\n  // Pagination yields one item per page; flatten all results\n  const allItems = $input.all();\n  const combined = allItems.flatMap(i => (i.json && i.json.results) || []);\n  all.l2_map[parentId] = combined;\n  if (combined.length === 0) console.log('L2 fetch returned 0 results for parent:', parentId);\n}\nreturn [{ json: { stored_parent: parentId } }];\n"
       }
     },
     {
